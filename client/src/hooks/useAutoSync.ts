@@ -53,8 +53,8 @@ export function useAutoSync(options: UseAutoSyncOptions = {}): UseAutoSyncReturn
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
-  
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isSyncingRef = useRef(false);
 
   const performSync = useCallback(async (): Promise<void> => {
@@ -71,11 +71,11 @@ export function useAutoSync(options: UseAutoSyncOptions = {}): UseAutoSyncReturn
     try {
       console.log("🔄 Auto-syncing contacts from Bolna...");
       const result = await syncContactsFromBolna(from, to);
-      
+
       setLastSyncAt(new Date());
       setStatus("idle");
       setIsOffline(false);
-      
+
       if (result.created > 0 || result.updated > 0) {
         console.log(`✅ Sync complete: ${result.created} created, ${result.updated} updated`);
         toast.success(`Synced: ${result.created} created, ${result.updated} updated`);
@@ -85,7 +85,7 @@ export function useAutoSync(options: UseAutoSyncOptions = {}): UseAutoSyncReturn
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Sync failed";
       console.error("❌ Auto-sync error:", errorMessage);
-      
+
       // Check if it's a network/offline error
       if (errorMessage.includes("Network Error") || errorMessage.includes("ERR_CONNECTION_REFUSED")) {
         setStatus("offline");
