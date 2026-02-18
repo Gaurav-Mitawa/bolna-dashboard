@@ -101,7 +101,7 @@ export function ScheduleCampaignDialog({
                   mode="single"
                   selected={date}
                   onSelect={setDate}
-                  disabled={(date) => {
+                  disabled={(date: Date) => {
                     // Disable past dates
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);

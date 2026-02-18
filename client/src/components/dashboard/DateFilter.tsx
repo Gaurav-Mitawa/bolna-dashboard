@@ -141,7 +141,7 @@ export function DateFilter({ value, onChange, className }: DateFilterProps) {
                     selected={customRange}
                     onSelect={setCustomRange}
                     numberOfMonths={2}
-                    disabled={(date) => date > new Date()}
+                    disabled={(date: Date) => date > new Date()}
                   />
                   <div className="flex justify-end gap-2">
                     <Button

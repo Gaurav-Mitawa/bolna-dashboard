@@ -30,9 +30,9 @@ const dateRangeOptions = [
   { value: "90", label: "Last 90 Days" },
 ];
 
-export function CampaignAnalytics({ 
-  analytics, 
-  isLoading, 
+export function CampaignAnalytics({
+  analytics,
+  isLoading,
   onRefresh,
   callType,
   onCallTypeChange,
@@ -53,39 +53,39 @@ export function CampaignAnalytics({
     );
   }
 
-  const callIntent = analytics?.callIntent || { 
-    booked: 0, notInterested: 0, followUp: 0, cancelled: 0, queries: 0, total: 0 
+  const callIntent = analytics?.callIntent || {
+    booked: 0, notInterested: 0, followUp: 0, cancelled: 0, queries: 0, total: 0
   };
-  const callStatus = analytics?.callStatus || { 
-    answered: 0, notAnswered: 0, officeHours: 0, nonOfficeHours: 0, total: 0 
+  const callStatus = analytics?.callStatus || {
+    answered: 0, notAnswered: 0, officeHours: 0, nonOfficeHours: 0, total: 0
   };
 
   // Calculate data based on call type
   const isOutbound = callType === "outbound";
-  
+
   // Call Intent Data
-  const intentData = isOutbound 
+  const intentData = isOutbound
     ? [
-        { label: "Booked", value: callIntent.booked, color: "#3B82F6" },
-        { label: "Not Interested", value: callIntent.notInterested, color: "#EF4444" },
-        { label: "Follow-up", value: callIntent.followUp, color: "#F97316" },
-      ]
+      { label: "Booked", value: callIntent.booked, color: "#3B82F6" },
+      { label: "Not Interested", value: callIntent.notInterested, color: "#EF4444" },
+      { label: "Follow-up", value: callIntent.followUp, color: "#F97316" },
+    ]
     : [
-        { label: "Booked", value: callIntent.booked, color: "#3B82F6" },
-        { label: "Cancelled", value: callIntent.cancelled, color: "#EF4444" },
-        { label: "Queries", value: callIntent.queries, color: "#10B981" },
-      ];
+      { label: "Booked", value: callIntent.booked, color: "#3B82F6" },
+      { label: "Cancelled", value: callIntent.cancelled, color: "#EF4444" },
+      { label: "Queries", value: callIntent.queries, color: "#10B981" },
+    ];
 
   // Call Status Data
   const statusData = isOutbound
     ? [
-        { label: "Answered", value: callStatus.answered, color: "#3B82F6" },
-        { label: "Not Answered", value: callStatus.notAnswered, color: "#EF4444" },
-      ]
+      { label: "Answered", value: callStatus.answered, color: "#3B82F6" },
+      { label: "Not Answered", value: callStatus.notAnswered, color: "#EF4444" },
+    ]
     : [
-        { label: "Office Hours", value: callStatus.officeHours, color: "#10B981" },
-        { label: "Non-Office Hours", value: callStatus.nonOfficeHours, color: "#F97316" },
-      ];
+      { label: "Office Hours", value: callStatus.officeHours, color: "#10B981" },
+      { label: "Non-Office Hours", value: callStatus.nonOfficeHours, color: "#F97316" },
+    ];
 
   // Calculate percentages
   const calculatePercentages = (data: { label: string; value: number; color: string }[]) => {
@@ -100,13 +100,13 @@ export function CampaignAnalytics({
   const statusDataWithPercent = calculatePercentages(statusData);
 
   // Generate SVG donut chart
-  const DonutChart = ({ 
-    data, 
-    total, 
-    subtitle 
-  }: { 
-    data: { label: string; value: number; color: string; percent: number }[]; 
-    total: number; 
+  const DonutChart = ({
+    data,
+    total,
+    subtitle
+  }: {
+    data: { label: string; value: number; color: string; percent: number }[];
+    total: number;
     subtitle: string;
   }) => {
     const radius = 80;
@@ -132,7 +132,7 @@ export function CampaignAnalytics({
               const dashArray = `${segmentLength} ${circumference}`;
               const dashOffset = -currentOffset;
               currentOffset += segmentLength;
-              
+
               return (
                 <circle
                   key={index}
@@ -155,13 +155,13 @@ export function CampaignAnalytics({
             <span className="text-sm text-gray-500">{subtitle}</span>
           </div>
         </div>
-        
+
         {/* Legend with counts */}
         <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
           {data.map((item, index) => (
             <div key={index} className="flex items-center gap-2">
-              <div 
-                className="w-3 h-3 rounded-full" 
+              <div
+                className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: item.color }}
               />
               <span className="text-sm text-gray-600">
@@ -191,7 +191,7 @@ export function CampaignAnalytics({
           </SelectContent>
         </Select>
 
-        <Select value={callType} onValueChange={(value) => onCallTypeChange(value as CallType)}>
+        <Select value={callType} onValueChange={(value: string) => onCallTypeChange(value as CallType)}>
           <SelectTrigger className="w-32">
             <SelectValue />
           </SelectTrigger>
@@ -220,9 +220,9 @@ export function CampaignAnalytics({
             </div>
           </CardHeader>
           <CardContent>
-            <DonutChart 
-              data={intentDataWithPercent} 
-              total={isOutbound 
+            <DonutChart
+              data={intentDataWithPercent}
+              total={isOutbound
                 ? callIntent.booked + callIntent.notInterested + callIntent.followUp
                 : callIntent.booked + callIntent.cancelled + callIntent.queries
               }

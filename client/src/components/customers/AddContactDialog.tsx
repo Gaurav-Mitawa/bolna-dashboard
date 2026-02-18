@@ -150,7 +150,7 @@ export function AddContactDialog({ open, onOpenChange, contact, onSuccess }: Add
                 <Label className="text-xs">Source</Label>
                 <Select
                   value={currentSource}
-                  onValueChange={(v) => setValue("source", v)}
+                  onValueChange={(v: string) => setValue("source", v)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select source" />
@@ -168,18 +168,18 @@ export function AddContactDialog({ open, onOpenChange, contact, onSuccess }: Add
                 <Label className="text-xs">Status</Label>
                 <Select
                   value={currentStatus}
-                  onValueChange={(v) => setValue("status", v)}
+                  onValueChange={(v: string) => setValue("status", v)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fresh">Fresh</SelectItem>
-                  <SelectItem value="purchased">Purchased</SelectItem>
-                  <SelectItem value="converted">Converted</SelectItem>
-                  <SelectItem value="fresh_na">Fresh - NA</SelectItem>
-                  <SelectItem value="not_interested">Not Interested</SelectItem>
-                </SelectContent>
+                  <SelectContent>
+                    <SelectItem value="fresh">Fresh</SelectItem>
+                    <SelectItem value="purchased">Purchased</SelectItem>
+                    <SelectItem value="converted">Converted</SelectItem>
+                    <SelectItem value="fresh_na">Fresh - NA</SelectItem>
+                    <SelectItem value="not_interested">Not Interested</SelectItem>
+                  </SelectContent>
                 </Select>
                 {errors.status && <p className="text-xs text-red-600">{errors.status.message}</p>}
               </div>
@@ -199,9 +199,9 @@ export function AddContactDialog({ open, onOpenChange, contact, onSuccess }: Add
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className={cn("bg-[#F15E04] hover:bg-[#d94f04]") } disabled={isSubmitting}>
-                {isSubmitting 
-                  ? (isEditMode ? "Saving..." : "Adding...") 
+              <Button type="submit" className={cn("bg-[#F15E04] hover:bg-[#d94f04]")} disabled={isSubmitting}>
+                {isSubmitting
+                  ? (isEditMode ? "Saving..." : "Adding...")
                   : (isEditMode ? "Save Changes" : "Add Contact")
                 }
               </Button>

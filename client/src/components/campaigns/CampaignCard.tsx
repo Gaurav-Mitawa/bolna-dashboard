@@ -19,11 +19,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Campaign } from "@/api/bolnaCampaigns";
-import { 
-  Play, 
-  Pause, 
-  MoreVertical, 
-  FileText, 
+import {
+  Play,
+  Pause,
+  MoreVertical,
+  FileText,
   Trash2,
   Bot,
   Loader2
@@ -64,7 +64,7 @@ export function CampaignCard({
       executed: { label: "Running", className: "bg-green-100 text-green-700" },
       stopped: { label: "Stopped", className: "bg-red-100 text-red-700" },
     };
-    
+
     const config = statusMap[status] || statusMap.created;
     return (
       <Badge className={cn("text-xs", config.className)}>
@@ -83,13 +83,13 @@ export function CampaignCard({
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
             <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
           </div>
-          
+
           {/* Name and badges */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                {campaign.agentName.length > 15 
-                  ? campaign.agentName.slice(0, 15) + "..." 
+                {campaign.agentName.length > 15
+                  ? campaign.agentName.slice(0, 15) + "..."
                   : campaign.agentName}
               </h3>
               <Badge variant="outline" className="text-[10px] sm:text-xs bg-orange-50 text-orange-700 border-orange-200 flex-shrink-0">
@@ -114,7 +114,7 @@ export function CampaignCard({
             <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap hidden sm:inline">Status Tag</span>
             <Select
               value={campaign.statusTag[0] || "fresh"}
-              onValueChange={(value) => onStatusChange(campaign.id, [value])}
+              onValueChange={(value: string) => onStatusChange(campaign.id, [value])}
               disabled={isLoading}
             >
               <SelectTrigger className="w-full sm:w-40 h-8 sm:h-9 text-xs sm:text-sm">
@@ -149,8 +149,8 @@ export function CampaignCard({
               size="icon"
               className={cn(
                 "h-8 w-8 sm:h-9 sm:w-9",
-                campaign.isActive 
-                  ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                campaign.isActive
+                  ? "bg-orange-500 hover:bg-orange-600 text-white"
                   : "border-green-500 text-green-600 hover:bg-green-50"
               )}
               onClick={() => onTogglePlay(campaign.id, !campaign.isActive)}
@@ -173,7 +173,7 @@ export function CampaignCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => onDelete(campaign.id)}
                   className="text-red-600"
                 >
@@ -194,10 +194,10 @@ export function CampaignCard({
             <span>{Math.round(((campaign.validContacts || 0) / campaign.totalContacts) * 100)}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-            <div 
+            <div
               className="bg-orange-500 h-1.5 sm:h-2 rounded-full transition-all duration-300"
-              style={{ 
-                width: `${((campaign.validContacts || 0) / campaign.totalContacts) * 100}%` 
+              style={{
+                width: `${((campaign.validContacts || 0) / campaign.totalContacts) * 100}%`
               }}
             />
           </div>
