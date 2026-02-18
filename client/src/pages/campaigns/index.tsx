@@ -179,7 +179,7 @@ export default function CampaignsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <span className="text-xs sm:text-sm font-medium text-gray-700 hidden sm:inline">Filters:</span>
-          <Select value={callType} onValueChange={(value) => setCallType(value as CallType)}>
+          <Select value={callType} onValueChange={(value: string) => setCallType(value as CallType)}>
             <SelectTrigger className="w-[120px] sm:w-32 h-8 sm:h-9 text-xs sm:text-sm">
               <SelectValue />
             </SelectTrigger>

@@ -106,15 +106,15 @@ function extractCallStatus(execution: BolnaExecution, mode: DashboardMode): stri
 }
 
 // Quick stat card component
-function StatCard({ 
-  title, 
-  value, 
-  icon: Icon, 
+function StatCard({
+  title,
+  value,
+  icon: Icon,
   trend,
-  trendUp 
-}: { 
-  title: string; 
-  value: string | number; 
+  trendUp
+}: {
+  title: string;
+  value: string | number;
   icon: React.ElementType;
   trend?: string;
   trendUp?: boolean;
@@ -302,7 +302,7 @@ export default function Dashboard() {
           <DateFilter value={dateRange} onChange={setDateRange} />
           <Select
             value={mode}
-            onValueChange={(v) => setMode(v as DashboardMode)}
+            onValueChange={(v: string) => setMode(v as DashboardMode)}
           >
             <SelectTrigger className="w-[120px] sm:w-[140px] h-9 sm:h-10 text-xs sm:text-sm">
               <SelectValue />
