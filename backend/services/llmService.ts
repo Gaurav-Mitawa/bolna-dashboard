@@ -53,7 +53,7 @@ export async function analyzeTranscript(
             "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: "grok-2-latest",
+            model: "grok-3-mini-fast",
             messages: [
                 { role: "system", content: SYSTEM_PROMPT },
                 { role: "user", content: `Transcript:\n${transcript}` },

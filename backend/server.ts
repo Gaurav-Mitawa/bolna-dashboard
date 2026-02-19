@@ -17,7 +17,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 app.use(cors());
