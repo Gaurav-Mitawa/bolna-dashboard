@@ -6,6 +6,7 @@
 import { pollNewCalls } from "./callPoller.js";
 import { analyzeTranscript } from "./llmService.js";
 import { Call } from "../models/Call.js";
+import { Contact } from "../models/Contact.js";
 
 const DELAY_BETWEEN_CALLS_MS = 10_000; // 10s pause between each LLM call
 const MAX_RETRIES = 3;
@@ -49,9 +50,19 @@ export async function processNewCalls() {
             await sleep(DELAY_BETWEEN_CALLS_MS);
         }
 
-        try {
-            const { analysis, raw } = await analyzeWithRetry(call.transcript, call.call_id);
+        let analysis = null;
+        let raw = null;
 
+        try {
+            const result = await analyzeWithRetry(call.transcript, call.call_id);
+            analysis = result.analysis;
+            raw = result.raw;
+        } catch (err) {
+            console.error(`[Processor] LLM analysis failed for ${call.call_id}, saving raw transcript only. Error:`, err);
+            // We continue to save the call with analysis=null
+        }
+
+        try {
             await Call.updateOne(
                 { call_id: call.call_id },
                 {
@@ -64,9 +75,37 @@ export async function processNewCalls() {
                         call_direction: analysis?.call_direction || "unknown",
                         llm_analysis: analysis,
                         processed: !!analysis,
-                        raw_llm_output: analysis ? null : raw,
+                        raw_llm_output: analysis ? null : raw, // Save raw if analysis failed
                         created_at: new Date(),
                     },
+                },
+                { upsert: true }
+            );
+
+            // Upsert Contact
+            const contactName = `Contact ${call.caller_number.slice(-4)}`;
+            const summary = analysis?.summary || (call.transcript ? call.transcript.substring(0, 100) + "..." : "No summary");
+            const tag = analysis?.intent || "fresh";
+
+            await Contact.findOneAndUpdate(
+                { phone: call.caller_number },
+                {
+                    $setOnInsert: {
+                        created_at: new Date(),
+                        name: contactName,
+                        email: ""
+                    },
+                    $set: {
+                        updated_at: new Date(),
+                        last_call_date: new Date(),
+                        last_call_summary: summary,
+                        tag: tag,
+                        source: call.agent_id ? "bolna_agent" : "unknown"
+                    },
+                    $inc: {
+                        call_count: 1,
+                        total_call_duration: call.call_duration || 0
+                    }
                 },
                 { upsert: true }
             );
@@ -76,11 +115,11 @@ export async function processNewCalls() {
                 console.log(`[Processor] ✓ ${call.call_id} — intent: ${analysis.intent}`);
             } else {
                 failed++;
-                console.log(`[Processor] ✗ ${call.call_id} — LLM parse failed, saved raw`);
+                console.log(`[Processor] ⚠ ${call.call_id} — Saved raw transcript (LLM failed)`);
             }
-        } catch (err) {
+        } catch (dbErr) {
             failed++;
-            console.error(`[Processor] Error on ${call.call_id}:`, err);
+            console.error(`[Processor] DB Error on ${call.call_id}:`, dbErr);
         }
     }
 

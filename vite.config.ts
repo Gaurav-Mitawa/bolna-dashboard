@@ -27,6 +27,7 @@ export default defineConfig({
       "/api/call-bookings": "http://localhost:5000",
       "/api/processed-calls": "http://localhost:5000",
       "/api/queries-calls": "http://localhost:5000",
+      "/api/contacts": "http://localhost:5000",
     },
     fs: {
       allow: [".."],

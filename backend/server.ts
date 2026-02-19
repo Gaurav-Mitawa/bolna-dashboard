@@ -23,8 +23,16 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 app.use(cors());
 app.use(express.json());
 
+import contactRoutes from "./routes/contactRoutes.js";
+
+// ... existing code ...
+
+app.use(cors());
+app.use(express.json());
+
 // Mount all call-processor routes under /api
 app.use("/api", callProcessorRoutes);
+app.use("/api/contacts", contactRoutes);
 
 /**
  * Auto-poll: process new Bolna calls every 5 minutes.
