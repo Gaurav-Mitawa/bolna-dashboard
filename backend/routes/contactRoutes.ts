@@ -38,6 +38,38 @@ router.get("/", async (req: Request, res: Response) => {
     }
 });
 
+// GET /api/contacts/:id/latest-structured-call
+router.get("/:id/latest-structured-call", async (req: Request, res: Response) => {
+    try {
+        const contact = await Contact.findById(req.params.id).lean();
+        // If not found by ID, try phone
+        const query = contact ? { caller_number: contact.phone } : { caller_number: req.params.id };
+
+        const latestCall = await Call.findOne(query)
+            .sort({ call_timestamp: -1 })
+            .lean();
+
+        if (!latestCall || !latestCall.llm_analysis) {
+            return res.json({ has_structured_data: false, message: "No analyzed calls found" });
+        }
+
+        const analysis = latestCall.llm_analysis;
+
+        res.json({
+            has_structured_data: true,
+            id: latestCall.call_id,
+            date: latestCall.call_timestamp,
+            intent: analysis.intent,
+            summary: analysis.summary,
+            structured_data: analysis.booking || {}, // Map booking data as structured data
+            sentiment_score: 0, // Placeholder
+            success_evaluation: "unknown"
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/contacts/:id - Get single contact + call history
 router.get("/:id", async (req: Request, res: Response) => {
     try {

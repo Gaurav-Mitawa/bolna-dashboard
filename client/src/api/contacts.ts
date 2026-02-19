@@ -179,7 +179,7 @@ export async function initiateCall(
  * @throws Error if the request fails
  */
 export async function getContactDetails(contactId: string) {
-  return authFetchJson(`/api/contacts/${contactId}/details`);
+  return authFetchJson(`/api/contacts/${contactId}`);
 }
 
 /**
