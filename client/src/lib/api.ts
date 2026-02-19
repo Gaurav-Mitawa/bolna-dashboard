@@ -7,7 +7,8 @@
  */
 
 // Get API base URL from environment variable or use default
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Get API base URL from environment variable or use default (empty for relative/proxy)
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Log API base URL in development to help debug
 if (import.meta.env.DEV) {

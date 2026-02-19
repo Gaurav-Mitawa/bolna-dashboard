@@ -111,11 +111,15 @@ function callToBooking(call: RawCall): Booking {
 
 // ─── API Functions ───────────────────────────────────────────
 
+import { API_BASE_URL } from "@/lib/api";
+
+// ─── API Functions ───────────────────────────────────────────
+
 /**
  * Fetch booked calls (intent = "booked", is_booked = true)
  */
 export async function getBookedCalls(): Promise<Booking[]> {
-  const res = await fetch("/api/call-bookings");
+  const res = await fetch(`${API_BASE_URL}/api/call-bookings`);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   const calls: RawCall[] = await res.json();
   return calls.map(callToBooking);
@@ -125,7 +129,7 @@ export async function getBookedCalls(): Promise<Booking[]> {
  * Fetch queries calls (intent = "queries")
  */
 export async function getQueriesCalls(): Promise<Booking[]> {
-  const res = await fetch("/api/queries-calls");
+  const res = await fetch(`${API_BASE_URL}/api/queries-calls`);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   const calls: RawCall[] = await res.json();
   return calls.map(callToBooking);
@@ -159,7 +163,7 @@ export async function getBookings(
  * Get a single booking by call_id
  */
 export async function getBooking(callId: string): Promise<Booking> {
-  const res = await fetch(`/api/call-bookings/${callId}`);
+  const res = await fetch(`${API_BASE_URL}/api/call-bookings/${callId}`);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   const call: RawCall = await res.json();
   return callToBooking(call);

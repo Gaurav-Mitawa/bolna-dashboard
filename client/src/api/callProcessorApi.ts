@@ -3,7 +3,8 @@
  * Talks to Express routes: /api/call-bookings, /api/processed-calls, etc.
  */
 
-const BASE = "";  // same origin — Express serves both frontend and API
+import { API_BASE_URL } from "@/lib/api";
+const BASE = API_BASE_URL;
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${BASE}${url}`, init);
