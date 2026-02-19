@@ -52,8 +52,8 @@ export function DonutCard({ title, subheader, data, emptyMessage }: DonutCardPro
         )}
 
         {/* Empty state message with responsive height */}
-        <div 
-          className="flex items-center justify-center min-h-[200px] sm:min-h-[280px] lg:min-h-[320px]" 
+        <div
+          className="flex items-center justify-center min-h-[200px] sm:min-h-[280px] lg:min-h-[320px]"
         >
           <p className="text-gray-400 text-center text-sm sm:text-base">
             {emptyMessage || "No data available"}
@@ -105,7 +105,7 @@ export function DonutCard({ title, subheader, data, emptyMessage }: DonutCardPro
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => [value, "Count"]}
+              formatter={(value: any) => [value, "Count"]}
               contentStyle={{
                 backgroundColor: "white",
                 border: "1px solid #e2e8f0",
