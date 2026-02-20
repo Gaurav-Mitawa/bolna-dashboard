@@ -1,3 +1,4 @@
+
 import { authFetchJson, authFetch } from "@/lib/api";
 import type { Contact, LeadTag, ContactSource } from "@/types";
 
@@ -12,6 +13,9 @@ export interface CallInitiateResponse {
   agent_name?: string;
 }
 
+// CallHistoryItem removed - valid import from types
+
+
 /**
  * Filters for querying contacts
  */
@@ -24,15 +28,28 @@ export interface ContactFilters {
 }
 
 /**
+ * Response from getContacts
+ */
+export interface GetContactsResponse {
+  contacts: Contact[];
+  pagination: {
+    total: number;
+    pages: number;
+    page: number;
+    limit: number;
+  };
+}
+
+/**
  * Get contacts from the backend API with optional filters
  *
  * @param filters - Optional filters for tag, source, search, pagination
- * @returns Promise resolving to array of contacts
+ * @returns Promise resolving to contacts and pagination
  * @throws Error if the API request fails
  */
 export async function getContacts(
   filters?: ContactFilters
-): Promise<Contact[]> {
+): Promise<GetContactsResponse> {
   const params = new URLSearchParams();
 
   if (filters?.tag) {
@@ -54,7 +71,7 @@ export async function getContacts(
   const queryString = params.toString();
   const url = `/api/contacts${queryString ? `?${queryString}` : ""}`;
 
-  return authFetchJson<Contact[]>(url);
+  return authFetchJson<GetContactsResponse>(url);
 }
 
 /**
@@ -69,7 +86,6 @@ export async function getContacts(
  * @throws Error if the contact is not found or request fails
  */
 export async function getContact(contactId: string): Promise<Contact> {
-  // Backend now returns ContactDetailResponse with last_call_intelligence
   return authFetchJson<Contact>(`/api/contacts/${contactId}`);
 }
 
@@ -237,11 +253,34 @@ export interface LatestStructuredCallResponse {
  * @returns Latest structured call data or message if none found
  * @throws Error if the request fails
  */
-export async function getLatestStructuredCall(
-  contactId: string
-): Promise<LatestStructuredCallResponse> {
+export async function getLatestStructuredCall(contactId: string) {
   return authFetchJson<LatestStructuredCallResponse>(
     `/api/contacts/${contactId}/latest-structured-call`
   );
 }
+
+export const contactsApi = {
+  // Wrapper to match previous API signature but use new getContacts
+  getAll: async (params: { page: number; limit: number; search?: string; tag?: string; source?: string }) => {
+    // Convert page/limit to skip/limit
+    const skip = (params.page - 1) * params.limit;
+    return getContacts({
+      skip,
+      limit: params.limit,
+      search: params.search,
+      tag: params.tag as any,
+      source: params.source as any,
+    });
+  },
+  getContacts,
+  getContact,
+  createContact,
+  updateContact,
+  deleteContact,
+  updateContactTag,
+  initiateCall,
+  getContactDetails,
+  getLatestStructuredCall,
+};
+
 

@@ -8,6 +8,17 @@ export interface ICall extends Document {
     call_timestamp: string;
     transcript: string;
     call_direction: string;
+    agent_name: string;
+    total_cost: number;
+    cost_breakdown: {
+        llm: number;
+        network: number;
+        platform: number;
+        synthesizer: number;
+        transcriber: number;
+    } | null;
+    recording_url: string;
+    extracted_data: Record<string, any> | null;
     llm_analysis: {
         summary: string;
         intent: string;
@@ -31,6 +42,11 @@ const CallSchema = new Schema<ICall>({
     call_timestamp: { type: String, default: "" },
     transcript: { type: String, default: "" },
     call_direction: { type: String, default: "unknown" },
+    agent_name: { type: String, default: "" },
+    total_cost: { type: Number, default: 0 },
+    cost_breakdown: { type: Schema.Types.Mixed, default: null },
+    recording_url: { type: String, default: "" },
+    extracted_data: { type: Schema.Types.Mixed, default: null },
     llm_analysis: {
         type: Schema.Types.Mixed,
         default: null,

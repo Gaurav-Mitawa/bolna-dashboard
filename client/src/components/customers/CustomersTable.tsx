@@ -12,13 +12,13 @@ import {
   Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Contact } from "@/api/bolnaContacts";
+import type { Contact } from "@/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Backend tag to UI status mapping (9 tags -> 4 UI statuses)
 type UIStatus = "purchased" | "converted" | "fresh" | "not_interested";
 
-export type { Contact };
+
 
 const statusMap: Record<UIStatus, { label: string; className: string }> = {
   purchased: {
@@ -85,7 +85,7 @@ function ContactCard({
 }) {
   const uiStatus = mapTagToStatus(contact.tag);
   const statusConfig = statusMap[uiStatus];
-  const mostRecentCall = contact.call_history?.[0];
+
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
@@ -99,14 +99,6 @@ function ContactCard({
             <p className="text-sm font-semibold text-gray-900 truncate">
               {contact.name}
             </p>
-            {contact.is_manual_status && (
-              <Badge
-                variant="outline"
-                className="text-[10px] mt-1 bg-yellow-50 text-yellow-700 border-yellow-200"
-              >
-                Manual
-              </Badge>
-            )}
           </div>
         </div>
         <Badge
@@ -133,20 +125,27 @@ function ContactCard({
           >
             {contact.source === "bolna_inbound" ? "Inbound" : "Outbound"}
           </Badge>
-          {mostRecentCall && (
+          {contact.last_call_date && (
             <span className="text-xs text-gray-400">
-              {formatRelativeTime(mostRecentCall.date)}
+              {formatRelativeTime(contact.last_call_date)}
             </span>
           )}
         </div>
       </div>
 
       {/* Call Summary */}
-      {mostRecentCall && (
+      {contact.last_call_summary && (
         <div className="bg-gray-50 rounded-lg p-3 mb-3">
-          <p className="text-xs text-gray-500 font-medium mb-1">Last Call Summary</p>
+          <p className="text-xs text-gray-500 font-medium mb-1 flex justify-between items-center">
+            <span>Last Call Summary</span>
+            {contact.last_call_agent && (
+              <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
+                {contact.last_call_agent}
+              </span>
+            )}
+          </p>
           <p className="text-sm text-gray-700 line-clamp-2">
-            {mostRecentCall.summary || "No summary available"}
+            {contact.last_call_summary}
           </p>
         </div>
       )}
@@ -216,7 +215,7 @@ export function CustomersTable({
             {data.map((row) => {
               const uiStatus = mapTagToStatus(row.tag);
               const statusConfig = statusMap[uiStatus];
-              const mostRecentCall = row.call_history?.[0];
+
 
               return (
                 <tr
@@ -233,14 +232,6 @@ export function CustomersTable({
                         <p className="text-sm font-semibold text-gray-900 truncate">
                           {row.name}
                         </p>
-                        {row.is_manual_status && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] mt-1 bg-yellow-50 text-yellow-700 border-yellow-200"
-                          >
-                            Manual
-                          </Badge>
-                        )}
                       </div>
                     </div>
                   </td>
@@ -278,14 +269,21 @@ export function CustomersTable({
 
                   {/* Last Call Summary */}
                   <td className="px-4 lg:px-6 py-4">
-                    {mostRecentCall ? (
+                    {row.last_call_summary ? (
                       <div className="max-w-[200px] lg:max-w-xs">
                         <p className="text-sm text-gray-700 line-clamp-2">
-                          {mostRecentCall.summary || "No summary available"}
+                          {row.last_call_summary}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {formatRelativeTime(mostRecentCall.date)}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-gray-400">
+                            {formatRelativeTime(row.last_call_date || "")}
+                          </p>
+                          {row.last_call_agent && (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-purple-50 text-purple-700 border-purple-100">
+                              {row.last_call_agent}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <span className="text-sm text-gray-400">No calls yet</span>

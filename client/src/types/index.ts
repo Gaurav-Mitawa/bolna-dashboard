@@ -27,7 +27,7 @@ export interface User {
 /**
  * Contact source tracking - where the lead originated from
  */
-export type ContactSource = "csv" | "pms" | "webchat" | "manual";
+export type ContactSource = "csv" | "pms" | "webchat" | "manual" | "bolna_inbound" | "bolna_outbound";
 
 /**
  * Complete 9-tag lead status system
@@ -121,6 +121,23 @@ export interface ContactIntelligence {
  * Complete contact entity with all tracking data
  * Updated with companyName field for B2B support and intelligence data
  */
+
+export interface CallHistoryItem {
+  id: string;
+  date: string;
+  duration: number;
+  status: string;
+  type: string;
+  intent?: string;
+  summary: string;
+  transcript?: string;
+  recording_url?: string;
+  agent_name?: string;
+  cost?: number;
+  cost_breakdown?: any;
+  extracted_data?: any;
+}
+
 export interface Contact {
   id: string;
   companyName?: string;        // NEW: B2B company name field
@@ -133,35 +150,19 @@ export interface Contact {
   pmsData?: PMSPersonalization; // Optional - may not exist for all contacts
   callSummaries: CallSummary[];
   purchasedPackage?: string | null;
-  purchased_package?: string | null;  // Backend uses snake_case
-  createdAt?: string;
-  created_at?: string;  // Backend uses snake_case
-  lastContactedAt?: string | null;
-  last_call_summary?: string | null;  // Last call summary (first 200 chars)
-  last_contacted_at?: string | null;  // Backend uses snake_case
-  last_call_date?: string | null;  // Last call date
-  no_answer_count?: number;
-  // Lead intelligence from VAPI structured outputs
-  lead_score?: number;  // 0-100 lead score
-  conversion_probability?: number;  // 0-100 conversion probability
-  // NEW: Intelligence data from last call (from backend ContactDetailResponse)
+  last_call_summary?: string | null;
+  last_call_date?: string | null;
+  last_call_agent?: string | null;
   last_call_intelligence?: ContactIntelligence | null;
+  call_history?: CallHistoryItem[];
+  updated_at?: string;
 }
+
 
 /**
  * Call history item for contact detail modal
  */
-export interface CallHistoryItem {
-  id: string;
-  type: 'CALL' | 'CHAT';
-  duration?: string;
-  agent: string;
-  sentiment?: string;
-  summary: string;
-  timestamp: string;
-  outcome?: string;
-  sentiment_score?: number;
-}
+
 
 /**
  * Booking data for contact detail modal
@@ -214,10 +215,10 @@ export type AgentStatus = "idle" | "running" | "paused";
  * Main agents: Fresh, Fresh-NA only
  * Follow-up agents: Converted, Follow-up only
  */
-export type LeadSourceOption = 
-  | "fresh" 
-  | "fresh_na" 
-  | "converted" 
+export type LeadSourceOption =
+  | "fresh"
+  | "fresh_na"
+  | "converted"
   | "purchased"
   | "not_interested"
   | "follow_up_interested"
@@ -431,6 +432,8 @@ export const SOURCE_CONFIG: Record<ContactSource, { label: string; color: string
   pms: { label: "PMS", color: "bg-blue-100 text-blue-600" },
   webchat: { label: "Webchat", color: "bg-purple-100 text-purple-600" },
   manual: { label: "Manual", color: "bg-amber-100 text-amber-600" },
+  bolna_inbound: { label: "Inbound", color: "bg-indigo-100 text-indigo-600" },
+  bolna_outbound: { label: "Outbound", color: "bg-cyan-100 text-cyan-600" },
 };
 
 // -----------------------------------------------------------------------------

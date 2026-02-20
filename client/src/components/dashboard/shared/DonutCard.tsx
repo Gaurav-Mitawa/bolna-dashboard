@@ -86,7 +86,7 @@ export function DonutCard({ title, subheader, data, emptyMessage }: DonutCardPro
       )}
 
       {/* Chart Container with Center Overlay - Responsive height */}
-      <div className="relative h-[240px] sm:h-[280px] lg:h-[320px]">
+      <div className="relative w-full h-[240px] sm:h-[280px] lg:h-[320px] min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

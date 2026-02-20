@@ -14,6 +14,7 @@ export default defineConfig({
       "/api/processed-calls": "http://localhost:5000",
       "/api/call-bookings": "http://localhost:5000",
       "/api/internal": "http://localhost:5000",
+      "/api/contacts": "http://localhost:5000",
     },
   },
   envDir: "../",

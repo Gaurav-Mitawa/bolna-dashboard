@@ -16,8 +16,9 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Zap,
 } from "lucide-react";
-import type { CallHistoryItem } from "@/api/bolnaContacts";
+import { CallHistoryItem } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface CallSummaryModalProps {
@@ -109,7 +110,7 @@ export function CallSummaryModal({ isOpen, onClose, call }: CallSummaryModalProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
         {/* Header - Image 4 Style */}
         <DialogHeader className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <DialogTitle className="text-xl font-semibold text-gray-900">
@@ -169,16 +170,38 @@ export function CallSummaryModal({ isOpen, onClose, call }: CallSummaryModalProp
               </div>
             </div>
 
-            {/* Transcript Section */}
-            <div className="bg-orange-50 rounded-xl p-5 border border-orange-100">
-              <h3 className="text-sm font-semibold text-orange-800 mb-3 flex items-center gap-2">
+            {/* AI Summary Section (If available) */}
+            {call.summary && call.summary !== call.transcript && (
+              <div className="bg-orange-50 rounded-xl p-5 border border-orange-100 shadow-sm">
+                <h3 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  AI Summary
+                </h3>
+                <div className="bg-white/80 rounded-lg p-4 border border-orange-100">
+                  <p className="text-sm text-gray-700 leading-relaxed italic">
+                    {call.summary}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Full Transcript Section */}
+            <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 shadow-sm">
+              <h3 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
                 <FileText className="w-4 h-4" />
-                Transcript
+                Full Conversation Transcript
               </h3>
-              <div className="bg-white rounded-lg p-4 border border-orange-100 overflow-y-auto">
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {call.transcript || call.summary || "No transcript available for this conversation."}
-                </p>
+              <div className="bg-white rounded-lg p-5 border border-blue-100 min-h-[300px]">
+                {call.transcript ? (
+                  <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">
+                    {call.transcript}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                    <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
+                    <p className="text-xs italic">Transcript is being processed or was not captured for this call.</p>
+                  </div>
+                )}
               </div>
             </div>
 

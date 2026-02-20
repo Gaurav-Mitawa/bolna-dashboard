@@ -37,7 +37,7 @@ Your project has **two parts** that need separate Render services:
 | Key | Value |
 |-----|-------|
 | `MONGODB_URI` | `mongodb+srv://...` _(your Atlas connection string)_ |
-| `GROK_API_KEY` | `gsk_...` _(your Grok API key)_ |
+| `GROK_API_KEY` | `gsk_...` (Groq) or `xai-...` (Grok) _(System auto-detects)_ |
 | `BOLNA_API_KEY` | `bn-...` _(your Bolna API key)_ |
 | `NODE_ENV` | `production` |
 

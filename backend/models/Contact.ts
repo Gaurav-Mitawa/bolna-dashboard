@@ -10,6 +10,7 @@ export interface IContact extends Document {
     total_call_duration: number;
     last_call_date: Date | null;
     last_call_summary: string;
+    last_call_agent: string;
     created_at: Date;
     updated_at: Date;
 }
@@ -24,6 +25,7 @@ const ContactSchema = new Schema<IContact>({
     total_call_duration: { type: Number, default: 0 },
     last_call_date: { type: Date, default: null },
     last_call_summary: { type: String, default: "" },
+    last_call_agent: { type: String, default: "" },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
 });

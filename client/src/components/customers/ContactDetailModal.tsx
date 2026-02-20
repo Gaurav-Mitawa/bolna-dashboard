@@ -20,8 +20,10 @@ import {
   Zap,
   Headphones,
   Clock,
+  ShoppingCart,
 } from "lucide-react";
-import type { Contact, CallHistoryItem } from "@/api/bolnaContacts";
+import type { Contact } from "@/types";
+import type { CallHistoryItem } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface ContactDetailModalProps {
@@ -42,15 +44,6 @@ function formatDate(dateString: string): string {
   });
 }
 
-// Format time for display
-function formatTime(dateString: string): string {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 // Get status badge styling
 function getStatusBadgeStyle(tag: string): string {
@@ -192,7 +185,7 @@ export function ContactDetailModal({
                   <Headphones className="h-16 w-16 text-gray-200 mx-auto mb-4" />
                   <p className="text-gray-500 font-medium mb-1">No History Yet</p>
                   <p className="text-sm text-gray-400">
-                    Call history will appear here
+                    Call history will appear here. If you just made a call, it might take a few seconds to sync.
                   </p>
                 </div>
               ) : (
@@ -200,16 +193,16 @@ export function ContactDetailModal({
                   <div
                     key={call.id}
                     onClick={() => onCallClick(call)}
-                    className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all hover:border-orange-200 cursor-pointer"
+                    className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all hover:border-orange-200 cursor-pointer group"
                   >
                     <div className="flex items-start gap-4">
                       {/* Call Icon */}
                       <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0",
-                        call.type === "inbound" ? "bg-purple-100" : "bg-blue-100"
+                        "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
+                        call.type === "inbound" ? "bg-purple-50 group-hover:bg-purple-100" : "bg-blue-50 group-hover:bg-blue-100"
                       )}>
                         <Phone className={cn(
-                          "h-6 w-6",
+                          "h-5 w-5",
                           call.type === "inbound" ? "text-purple-600" : "text-blue-600"
                         )} />
                       </div>
@@ -220,50 +213,59 @@ export function ContactDetailModal({
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <Badge
                             variant="outline"
-                            className={cn("text-xs capitalize", getCallTypeStyle(call.type))}
+                            className={cn("text-[10px] h-5 uppercase px-2", getCallTypeStyle(call.type))}
                           >
                             {call.type || "Call"}
                           </Badge>
 
-                          <span className="text-sm text-gray-500 flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {formatTime(call.date)}
-                          </span>
-
                           <Badge
                             variant="outline"
-                            className={cn("text-xs", getIntentStyle(call.intent))}
+                            className={cn("text-[10px] h-5 px-2", getIntentStyle(call.intent))}
                           >
                             {call.intent || "No intent"}
                           </Badge>
 
-                          <span className="text-xs text-gray-400 ml-auto">
+                          {call.agent_name && (
+                            <Badge variant="secondary" className="text-[10px] h-5 px-2 bg-gray-100 text-gray-600">
+                              {call.agent_name}
+                            </Badge>
+                          )}
+
+                          <span className="text-xs text-gray-400 ml-auto flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
                             {formatRelativeTime(call.date)}
                           </span>
                         </div>
 
                         {/* Summary */}
-                        <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
-                          {call.summary || "No transcript available"}
+                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                          {call.summary || call.transcript || "Conversation in progress or transcript pending..."}
                         </p>
 
-                        {/* Footer */}
-                        {call.recording_url && (
-                          <div className="flex items-center gap-2 mt-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(call.recording_url, "_blank");
-                              }}
-                              className="h-8 text-xs"
-                            >
-                              <Headphones className="h-3.5 w-3.5 mr-1" />
-                              Listen
-                            </Button>
+                        {/* Footer - Explicit View Button */}
+                        <div className="flex items-center justify-between mt-3 text-xs">
+                          <div className="flex items-center gap-3">
+                            {call.duration > 0 && (
+                              <span className="text-gray-400 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {Math.floor(call.duration / 60)}:{(call.duration % 60).toString().padStart(2, '0')}
+                              </span>
+                            )}
+                            {call.cost !== undefined && call.cost > 0 && (
+                              <span className="text-gray-400 flex items-center gap-1 font-medium">
+                                ₹{call.cost.toFixed(2)}
+                              </span>
+                            )}
                           </div>
-                        )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px] text-orange-600 hover:text-orange-700 hover:bg-orange-50 font-semibold gap-1"
+                          >
+                            <FileText className="h-3 w-3" />
+                            View Transcript
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -272,14 +274,51 @@ export function ContactDetailModal({
             </div>
           </TabsContent>
 
-          {/* Action Tab Content */}
-          <TabsContent value="action" className="p-6 m-0 flex-1 overflow-y-auto">
-            <div className="text-center py-16">
-              <Zap className="h-16 w-16 text-gray-200 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium mb-1">Coming Soon</p>
-              <p className="text-sm text-gray-400">
-                Action features will be available here
-              </p>
+          {/* Action Tab Content - Showing structured info */}
+          <TabsContent value="action" className="p-6 m-0 flex-1 overflow-y-auto max-h-[calc(90vh-280px)]">
+            <div className="space-y-6">
+              {/* Contact Intelligence Overview */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Source</p>
+                  <p className="text-sm font-semibold text-gray-900 capitalize">{contact.source}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Lead Status</p>
+                  <Badge className={cn("mt-1", getStatusBadgeStyle(contact.tag))}>
+                    {getStatusLabel(contact.tag)}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Last Call Data if exists */}
+              {contact.last_call_summary && (
+                <div className="bg-orange-50 rounded-xl p-5 border border-orange-100">
+                  <h3 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    Latest Intelligence
+                  </h3>
+                  <div className="bg-white/80 rounded-lg p-4 border border-orange-100">
+                    <p className="text-sm text-gray-700 leading-relaxed italic">
+                      "{contact.last_call_summary}"
+                    </p>
+                    {contact.last_call_agent && (
+                      <p className="text-[10px] text-orange-600 mt-2 font-medium">
+                        Captured by {contact.last_call_agent} on {contact.last_call_date ? formatDate(contact.last_call_date) : 'recent call'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Coming Soon Placeholder for more complex actions */}
+              <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 text-center">
+                <ShoppingCart className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-blue-900">Booking Integration</p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Direct booking and PMS integration will be available here.
+                </p>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

@@ -6,7 +6,7 @@ import express from "express";
 import cors from "cors";
 import { connectDB } from "./db.js";
 import callProcessorRoutes from "./routes/callProcessorRoutes.js";
-import { processNewCalls } from "./services/callProcessor.js";
+import { startAutoPolling } from "./services/scheduler.js";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -18,43 +18,15 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 app.use(cors());
 app.use(express.json());
 
 import contactRoutes from "./routes/contactRoutes.js";
 
-// ... existing code ...
-
-app.use(cors());
-app.use(express.json());
-
 // Mount all call-processor routes under /api
 app.use("/api", callProcessorRoutes);
 app.use("/api/contacts", contactRoutes);
-
-/**
- * Auto-poll: process new Bolna calls every 5 minutes.
- */
-function startAutoPolling() {
-    // Run once immediately on startup
-    processNewCalls()
-        .then((r) => console.log(`[AutoPoll] Initial run — ${r.processed} processed, ${r.failed} failed out of ${r.total}`))
-        .catch((err) => console.error("[AutoPoll] Initial run error:", err));
-
-    // Then repeat every 5 minutes
-    setInterval(async () => {
-        try {
-            const result = await processNewCalls();
-            console.log(`[AutoPoll] ${result.processed} processed, ${result.failed} failed out of ${result.total}`);
-        } catch (err) {
-            console.error("[AutoPoll] Error:", err);
-        }
-    }, POLL_INTERVAL_MS);
-
-    console.log(`[AutoPoll] Polling every ${POLL_INTERVAL_MS / 1000}s`);
-}
 
 async function start() {
     await connectDB();

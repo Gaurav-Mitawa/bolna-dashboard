@@ -47,6 +47,8 @@ export function ContactDetailModal({
   onEdit
 }: ContactDetailModalProps) {
   const [activeTab, setActiveTab] = useState("history");
+  const [selectedCall, setSelectedCall] = useState<CallHistoryItem | null>(null);
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
 
   // Fetch contact details
   const { data: contactDetails, isLoading: isLoadingDetails } = useQuery<ContactDetails>({
@@ -142,7 +144,11 @@ export function ContactDetailModal({
                 callHistory.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all hover:border-orange-200"
+                    className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all hover:border-orange-200 cursor-pointer group"
+                    onClick={() => {
+                      setSelectedCall(item);
+                      setIsTranscriptOpen(true);
+                    }}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3 flex-1">
@@ -166,29 +172,35 @@ export function ContactDetailModal({
                                 {item.duration}
                               </span>
                             )}
-                            {item.agent && (
+                            {item.agent_name && (
                               <Badge className="bg-orange-100 text-orange-700 text-xs border-orange-200 px-2.5 py-0.5">
-                                {item.agent}
+                                {item.agent_name}
                               </Badge>
                             )}
-                            {item.sentiment && (
-                              <Badge className="bg-green-100 text-green-700 text-xs border-green-200 px-2.5 py-0.5">
-                                {item.sentiment}
-                              </Badge>
-                            )}
-                            {item.outcome && (
+
+                            {item.intent && (
                               <Badge className="bg-teal-100 text-teal-700 text-xs border-teal-200 px-2.5 py-0.5">
-                                {item.outcome}
+                                {item.intent}
                               </Badge>
                             )}
                           </div>
                           <p className="text-sm text-gray-600 leading-relaxed mt-2">
                             {item.summary}
                           </p>
+                          <div className="mt-4 flex justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50 gap-1.5 h-8 font-semibold"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              View Transcript
+                            </Button>
+                          </div>
                         </div>
                       </div>
                       <span className="text-xs text-gray-400 whitespace-nowrap ml-4">
-                        {item.timestamp}
+                        {new Date(item.date).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -344,6 +356,57 @@ export function ContactDetailModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Transcript Detail Modal */}
+      <Dialog open={isTranscriptOpen} onOpenChange={setIsTranscriptOpen}>
+        <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden max-h-[85vh] flex flex-col">
+          <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                <FileText className="h-5 w-5 text-orange-400" />
+              </div>
+              <div>
+                <h3 className="font-bold">Call Transcript</h3>
+                <p className="text-xs text-slate-400">
+                  {selectedCall ? new Date(selectedCall.date).toLocaleString() : ""}
+                </p>
+              </div>
+            </div>
+            {selectedCall?.duration && (
+              <Badge variant="outline" className="text-white border-white/20">
+                {selectedCall.duration}
+              </Badge>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+            {selectedCall?.summary && (
+              <div className="mb-6">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">AI Summary</h4>
+                <div className="bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-700 leading-relaxed shadow-sm">
+                  {selectedCall.summary}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Full Transcript</h4>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 font-mono text-sm text-slate-600 whitespace-pre-wrap leading-relaxed shadow-sm min-h-[200px]">
+                {selectedCall?.transcript || "No transcript available for this call."}
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t bg-white px-6 py-4 flex justify-end">
+            <Button
+              onClick={() => setIsTranscriptOpen(false)}
+              className="bg-slate-900 hover:bg-slate-800 text-white"
+            >
+              Done Reading
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

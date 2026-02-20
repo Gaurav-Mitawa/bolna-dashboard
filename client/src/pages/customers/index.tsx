@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Users, Filter, Loader2, ChevronLeft, ChevronRight, RefreshCw, Phone, Search } from "lucide-react";
-import { CustomersTable, type Contact } from "@/components/customers/CustomersTable";
+import { CustomersTable } from "@/components/customers/CustomersTable";
+import type { Contact, CallHistoryItem } from "@/types";
 import { ContactDetailModal } from "@/components/customers/ContactDetailModal";
 import { CallSummaryModal } from "@/components/customers/CallSummaryModal";
-import { contactsApi } from "@/api/bolnaContacts";
-import type { CallHistoryItem } from "@/api/bolnaContacts";
+import { contactsApi } from "@/api/contacts";
 import { toast } from "sonner";
 import {
   Select,
@@ -26,7 +26,7 @@ export default function CustomersIndexPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  
+
   // Modal states
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -37,11 +37,14 @@ export default function CustomersIndexPage() {
   const { data: contactsData, isLoading, error: queryError, refetch, isRefetching } = useQuery({
     queryKey: ["bolna-contacts", page, search, statusFilter, sourceFilter],
     queryFn: () =>
-      contactsApi.getContacts(page, PAGE_SIZE, {
+      contactsApi.getAll({
+        page,
+        limit: PAGE_SIZE,
         search: search || undefined,
-        tag: statusFilter !== "all" ? [statusFilter] : undefined,
-        source: sourceFilter !== "all" ? [sourceFilter] : undefined,
+        tag: statusFilter !== "all" ? statusFilter : undefined,
+        source: sourceFilter !== "all" ? sourceFilter : undefined,
       }),
+    refetchInterval: 5000, // Poll every 5 seconds for live updates
     staleTime: 0, // Always fetch fresh data
   });
 
@@ -52,15 +55,15 @@ export default function CustomersIndexPage() {
     }
   }, [contactsData, isLoading]);
 
-  const contacts = contactsData?.items || [];
-  const totalPages = contactsData?.total_pages || 1;
-  const totalCount = contactsData?.total || 0;
+  const contacts = contactsData?.contacts || [];
+  const totalPages = contactsData?.pagination?.pages || 1;
+  const totalCount = contactsData?.pagination?.total || 0;
 
   // Refresh data from Bolna
   const refreshData = async () => {
     try {
       await refetch();
-      toast.success("Data refreshed from Bolna");
+      toast.success("Data refreshed");
     } catch (error) {
       console.error("Refresh error:", error);
       toast.error("Failed to refresh data");
@@ -80,10 +83,20 @@ export default function CustomersIndexPage() {
     return `${hours} hours ago`;
   };
 
-  // Handle view contact - opens detail modal
-  const handleViewContact = useCallback((contact: Contact) => {
+  // Handle view contact - opens detail modal and fetches full history if needed
+  const handleViewContact = useCallback(async (contact: Contact) => {
     setSelectedContact(contact);
     setIsDetailModalOpen(true);
+
+    // Fetch full details including history from backend
+    try {
+      const fullDetails = await contactsApi.getContactDetails(contact.id);
+      // fullDetails from backend is { ...contact, call_history: [...] }
+      setSelectedContact(fullDetails);
+    } catch (error) {
+      console.error("Failed to fetch contact details:", error);
+      // We still have the basic contact data from the list
+    }
   }, []);
 
   // Handle call click from detail modal - opens call summary modal
@@ -114,8 +127,8 @@ export default function CustomersIndexPage() {
             <div className="min-w-0 flex-1">
               <p className="text-lg sm:text-xl font-semibold text-gray-900">Customers Lead</p>
               <p className="text-xs sm:text-sm text-gray-500">
-                <span className="hidden sm:inline">View customer interactions from Bolna executions</span>
-                <span className="sm:hidden">Bolna customer data</span>
+                <span className="hidden sm:inline">Real-time customer interactions</span>
+                <span className="sm:hidden">Customer data</span>
                 {lastRefreshed && (
                   <span className="text-gray-400 ml-2 hidden sm:inline">
                     (Last refreshed: {getLastRefreshedText()})
@@ -128,15 +141,15 @@ export default function CustomersIndexPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 sm:hidden" />
-              <Input 
-                placeholder="Search by name or phone..." 
+              <Input
+                placeholder="Search by name or phone..."
                 className="w-full sm:w-64 bg-gray-50 pl-9 sm:pl-3 text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-9 sm:h-10 text-gray-700 gap-1.5 flex-shrink-0 text-sm"
               onClick={refreshData}
               disabled={isRefetching}
@@ -157,7 +170,7 @@ export default function CustomersIndexPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <span className="flex items-center gap-1 text-sm text-gray-700">
-            <Filter className="h-4 w-4 text-gray-500" /> 
+            <Filter className="h-4 w-4 text-gray-500" />
             <span className="hidden sm:inline">Filters:</span>
           </span>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
@@ -194,9 +207,9 @@ export default function CustomersIndexPage() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
           <p className="text-red-700 font-medium text-sm sm:text-base">Error loading contacts</p>
           <p className="text-red-600 text-xs sm:text-sm">{(queryError as Error).message}</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="mt-2"
             onClick={refreshData}
           >
@@ -226,7 +239,7 @@ export default function CustomersIndexPage() {
           </Button>
         </div>
       ) : (
-        <CustomersTable 
+        <CustomersTable
           data={contacts}
           onView={handleViewContact}
           onEdit={handleEditContact}

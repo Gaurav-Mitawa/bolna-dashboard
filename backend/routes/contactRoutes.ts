@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import { Contact } from "../models/Contact.js";
 import { Call } from "../models/Call.js";
+import { syncCallsForPhone } from "../services/callPoller.js";
+import { analyzeTranscript } from "../services/llmService.js";
 
 const router = Router();
 
@@ -17,6 +19,8 @@ router.get("/", async (req: Request, res: Response) => {
             query.$or = [{ name: searchRegex }, { phone: searchRegex }, { email: searchRegex }];
         }
 
+        const total = await Contact.countDocuments(query);
+
         const contacts = await Contact.find(query)
             .sort({ last_call_date: -1, created_at: -1 })
             .limit(Number(limit) || 50)
@@ -32,7 +36,15 @@ router.get("/", async (req: Request, res: Response) => {
             id: c._id.toString(), // Frontend expects string ID
         }));
 
-        res.json(result);
+        res.json({
+            contacts: result,
+            pagination: {
+                total,
+                page: Math.floor((Number(skip) || 0) / (Number(limit) || 50)) + 1,
+                pages: Math.ceil(total / (Number(limit) || 50)),
+                limit: Number(limit) || 50
+            }
+        });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -84,9 +96,35 @@ router.get("/:id", async (req: Request, res: Response) => {
         }
 
         // Fetch call history for this contact's phone
-        const calls = await Call.find({ caller_number: contact.phone })
+        let calls = await Call.find({ caller_number: contact.phone })
             .sort({ call_timestamp: -1 })
             .lean();
+
+        // If history is empty, try to sync from Bolna on the fly
+        if (calls.length === 0) {
+            console.log(`[Routes] No history found for ${contact.phone}, syncing from Bolna...`);
+            try {
+                const syncedCalls = await syncCallsForPhone(contact.phone);
+                console.log(`[Routes] Sync found ${syncedCalls.length} calls for ${contact.phone}`);
+
+                if (syncedCalls.length > 0) {
+                    // Save synced calls to DB (without processing them with LLM immediately for speed)
+                    for (const call of syncedCalls) {
+                        await Call.updateOne(
+                            { call_id: call.call_id },
+                            { $set: { ...call, created_at: new Date(call.call_timestamp) }, $setOnInsert: { processed: false } },
+                            { upsert: true }
+                        );
+                    }
+                    // Fetch again
+                    calls = await Call.find({ caller_number: contact.phone })
+                        .sort({ call_timestamp: -1 })
+                        .lean();
+                }
+            } catch (err: any) {
+                console.error(`[Routes] Sync failed for ${contact.phone}:`, err.message);
+            }
+        }
 
         // Transform calls to frontend format (CallHistoryItem)
         const callHistory = calls.map(call => ({
@@ -98,8 +136,11 @@ router.get("/:id", async (req: Request, res: Response) => {
             intent: call.llm_analysis?.intent,
             summary: call.llm_analysis?.summary || call.transcript, // Fallback to transcript if no summary
             transcript: call.transcript,
-            recording_url: "", // Not stored yet?
-            agent_name: call.agent_id
+            recording_url: call.recording_url || "",
+            agent_name: call.agent_name || call.agent_id,
+            cost: call.total_cost || 0,
+            cost_breakdown: call.cost_breakdown || null,
+            extracted_data: call.extracted_data || null
         }));
 
         res.json({

@@ -91,6 +91,11 @@ app.use((req, res, next) => {
   const { connectDB } = await import("../backend/db.js");
   const callProcessorRoutes = (await import("../backend/routes/callProcessorRoutes.js")).default;
   await connectDB();
+
+  // Start the background poller
+  const { startAutoPolling } = await import("../backend/services/scheduler.js");
+  startAutoPolling();
+
   app.use("/api", callProcessorRoutes);
 
   // Proxy API requests to FastAPI backend (port 8000)
@@ -230,6 +235,10 @@ app.use((req, res, next) => {
       },
     })
   );
+
+  // Mount Contact Routes (Node.js/Express handling MongoDB)
+  const contactRoutes = (await import("../backend/routes/contactRoutes.js")).default;
+  app.use("/api/contacts", contactRoutes);
 
   // Proxy Auth API routes (CRITICAL: Must be before other /api routes)
   app.use(

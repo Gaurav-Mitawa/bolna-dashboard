@@ -41,10 +41,37 @@ Return ONLY the JSON. No explanation. No markdown. No extra text.`;
 export async function analyzeTranscript(
     transcript: string
 ): Promise<{ analysis: LLMAnalysis | null; raw: string }> {
-    const apiKey = process.env.GROK_API_KEY;
-    if (!apiKey) throw new Error("GROK_API_KEY not set in .env");
+    const grokKey = process.env.GROK_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
 
-    const url = "https://api.x.ai/v1/chat/completions";
+    let apiKey = grokKey || geminiKey;
+    if (!apiKey) throw new Error("No LLM API Key (GROK_API_KEY or GEMINI_API_KEY) found in .env");
+
+    let url = "https://api.x.ai/v1/chat/completions";
+    let model = "grok-3-mini";
+
+    // --- Automatic Provider Detection ---
+    if (apiKey.startsWith("gsk_")) {
+        // Groq API Key
+        url = "https://api.groq.com/openai/v1/chat/completions";
+        model = "llama-3.1-8b-instant";
+        console.log("[LLM] Using Groq provider");
+    } else if (apiKey.startsWith("xai-")) {
+        // Grok (xAI) API Key
+        url = "https://api.x.ai/v1/chat/completions";
+        model = "grok-3-mini";
+        console.log("[LLM] Using Grok (xAI) provider");
+    } else if (apiKey.startsWith("AIza")) {
+        // Gemini API Key (OpenAI Compatible Endpoint)
+        url = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+        model = "gemini-1.5-flash";
+        console.log("[LLM] Using Gemini provider");
+    } else if (grokKey) {
+        // Default to Grok if GROK_API_KEY is set but prefix is unknown
+        url = "https://api.x.ai/v1/chat/completions";
+        model = "grok-3-mini";
+        console.log("[LLM] Using default Grok provider");
+    }
 
     const res = await fetch(url, {
         method: "POST",
@@ -53,7 +80,7 @@ export async function analyzeTranscript(
             "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: "grok-3-mini",
+            model: model,
             messages: [
                 { role: "system", content: SYSTEM_PROMPT },
                 { role: "user", content: `Transcript:\n${transcript}` },
@@ -65,12 +92,11 @@ export async function analyzeTranscript(
 
     if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`Grok API ${res.status}: ${errText}`);
+        throw new Error(`LLM API (${model}) ${res.status}: ${errText}`);
     }
 
     const data = await res.json();
-    const raw: string =
-        data.choices?.[0]?.message?.content || "";
+    const raw: string = data.choices?.[0]?.message?.content || "";
 
     // Try to parse JSON from the response
     try {
