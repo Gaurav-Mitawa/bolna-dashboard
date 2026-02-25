@@ -1,6 +1,6 @@
 /**
  * Create Campaign Modal
- * Modal for creating new outbound campaigns
+ * Creates campaigns via backend proxy (per-user Bolna key, CSV from CRM)
  */
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,60 +18,80 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { agentApi, phoneNumbersApi, BolnaAgent, BolnaPhoneNumber } from "@/lib/bolnaApi";
-import { CreateCampaignData, generateCSVFromCustomers, downloadCSVTemplate } from "@/api/bolnaCampaigns";
-import { Upload, Download, FileText, Loader2, ChevronRight, ChevronLeft } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Users } from "lucide-react";
 import { toast } from "sonner";
+
+interface Agent {
+  agent_id?: string;
+  id?: string;
+  agent_name: string;
+}
+
+interface PhoneNumber {
+  phone_number: string;
+  agent_id?: string | null;
+}
 
 interface CreateCampaignModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (data: CreateCampaignData) => Promise<void>;
+  onCreated?: () => void;
 }
 
 const statusOptions = [
   { value: "fresh", label: "Fresh" },
-  { value: "purchased", label: "Purchased" },
-  { value: "converted", label: "Converted" },
-  { value: "fresh_na", label: "Fresh - NA" },
+  { value: "interested", label: "Interested" },
   { value: "not_interested", label: "Not Interested" },
+  { value: "booked", label: "Booked" },
+  { value: "NA", label: "N/A" },
 ];
 
 export function CreateCampaignModal({
   open,
   onOpenChange,
-  onCreate,
+  onCreated,
 }: CreateCampaignModalProps) {
   const [step, setStep] = useState(1);
-  const [agents, setAgents] = useState<BolnaAgent[]>([]);
-  const [phoneNumbers, setPhoneNumbers] = useState<BolnaPhoneNumber[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [customerCount, setCustomerCount] = useState(0);
-  
-  // Form data
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["fresh"]);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [campaignName, setCampaignName] = useState("");
+
+  const [selectedStatus, setSelectedStatus] = useState<string>("fresh");
   const [selectedAgent, setSelectedAgent] = useState<string>("");
   const [selectedPhoneNumber, setSelectedPhoneNumber] = useState<string>("");
 
-  // Filter available phone numbers for selected agent
   const availablePhoneNumbers = useMemo(() => {
-    if (!selectedAgent) return [];
-    return phoneNumbers.filter(phone => 
-      phone.agent_id === null || phone.agent_id === selectedAgent
+    if (!selectedAgent) return phoneNumbers;
+    return phoneNumbers.filter(
+      (p) => p.agent_id === null || p.agent_id === undefined || p.agent_id === selectedAgent
     );
   }, [phoneNumbers, selectedAgent]);
 
-  // Reset phone number when agent changes or set default
+  useEffect(() => {
+    if (open) {
+      loadData();
+      setStep(1);
+      setSelectedStatus("fresh");
+      setSelectedAgent("");
+      setSelectedPhoneNumber("");
+      setCampaignName("");
+      setPreviewCount(null);
+    }
+  }, [open]);
+
   useEffect(() => {
     if (availablePhoneNumbers.length > 0) {
-      // Check if current selection is still valid
-      const isCurrentValid = availablePhoneNumbers.some(p => p.phone_number === selectedPhoneNumber);
-      if (!isCurrentValid) {
+      const currentValid = availablePhoneNumbers.some(
+        (p) => p.phone_number === selectedPhoneNumber
+      );
+      if (!currentValid) {
         setSelectedPhoneNumber(availablePhoneNumbers[0].phone_number);
       }
     } else {
@@ -78,109 +99,62 @@ export function CreateCampaignModal({
     }
   }, [availablePhoneNumbers, selectedPhoneNumber]);
 
-  // Load agents and phone numbers when modal opens
-  useEffect(() => {
-    if (open) {
-      loadData();
-    }
-  }, [open]);
-
   const loadData = async () => {
     setIsLoadingData(true);
     setDataError(null);
     try {
-      console.log("Fetching agents and phone numbers...");
-      const [agentsData, phoneNumbersData] = await Promise.all([
-        agentApi.getAll(),
-        phoneNumbersApi.getAll(),
+      const [agentsRes, phonesRes] = await Promise.all([
+        fetch("/api/bolna/agents", { credentials: "include" }),
+        fetch("/api/bolna/phone-numbers", { credentials: "include" }),
       ]);
-      
-      console.log("Agents received:", agentsData);
-      console.log("Phone numbers received:", phoneNumbersData);
-      
-      setAgents(agentsData);
-      setPhoneNumbers(phoneNumbersData);
-      
-      // Set defaults
-      if (agentsData.length > 0) {
-        setSelectedAgent(agentsData[0].id);
+
+      if (!agentsRes.ok) throw new Error("Failed to fetch agents");
+      if (!phonesRes.ok) throw new Error("Failed to fetch phone numbers");
+
+      const { agents: agentsData } = await agentsRes.json();
+      const { numbers: phonesData } = await phonesRes.json();
+
+      const normalizedAgents: Agent[] = (agentsData || []).map((a: any) => ({
+        agent_id: a.agent_id || a.id,
+        agent_name: a.agent_name || a.name || "Unnamed Agent",
+      }));
+
+      setAgents(normalizedAgents);
+      setPhoneNumbers(phonesData || []);
+
+      if (normalizedAgents.length > 0) {
+        setSelectedAgent(normalizedAgents[0].agent_id || "");
       }
-      // Phone number will be set by the useEffect below when agent changes
-      
-      if (agentsData.length === 0) {
-        console.warn("No agents found in the API response");
-      }
-      if (phoneNumbersData.length === 0) {
-        console.warn("No phone numbers found in the API response");
-      }
-    } catch (error) {
-      console.error("Error loading data:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to load agents and phone numbers";
-      setDataError(errorMessage);
-      toast.error(errorMessage);
+    } catch (err: any) {
+      const msg = err.message || "Failed to load agents and phone numbers";
+      setDataError(msg);
+      toast.error(msg);
     } finally {
       setIsLoadingData(false);
     }
   };
 
-  // Calculate customer count when status changes
-  useEffect(() => {
-    if (step === 1 && selectedStatuses.length > 0) {
-      calculateCustomerCount();
-    }
-  }, [selectedStatuses, step]);
-
-  const calculateCustomerCount = async () => {
+  const loadPreview = async (status: string) => {
     try {
-      const csvBlob = await generateCSVFromCustomers(selectedStatuses);
-      const text = await csvBlob.text();
-      const lines = text.split("\n").filter(line => line.trim());
-      setCustomerCount(Math.max(0, lines.length - 1)); // Exclude header
-    } catch (error) {
-      console.error("Error calculating customer count:", error);
-      setCustomerCount(0);
-    }
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type !== "text/csv" && !file.name.endsWith(".csv")) {
-        toast.error("Please upload a CSV file");
-        return;
+      const res = await fetch(`/api/campaigns/preview?status=${status}`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewCount(data.count ?? 0);
       }
-      setSelectedFile(file);
+    } catch {
+      setPreviewCount(null);
     }
   };
 
-  const handleDownloadTemplate = () => {
-    downloadCSVTemplate();
-    toast.success("Template downloaded");
-  };
-
-  const handleDownloadFromStatus = async () => {
-    try {
-      const csvBlob = await generateCSVFromCustomers(selectedStatuses);
-      const url = window.URL.createObjectURL(csvBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `customers_${selectedStatuses.join("_")}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success("CSV downloaded with filtered customers");
-    } catch (error) {
-      console.error("Error downloading CSV:", error);
-      toast.error("Failed to generate CSV");
+  useEffect(() => {
+    if (step === 1 && selectedStatus) {
+      loadPreview(selectedStatus);
     }
-  };
+  }, [selectedStatus, step]);
 
   const handleCreate = async () => {
-    if (!selectedFile) {
-      toast.error("Please upload a CSV file");
-      return;
-    }
     if (!selectedAgent) {
       toast.error("Please select an agent");
       return;
@@ -190,54 +164,53 @@ export function CreateCampaignModal({
       return;
     }
 
-    setIsLoading(true);
+    setIsCreating(true);
     try {
-      await onCreate({
-        agentId: selectedAgent,
-        file: selectedFile,
-        fromPhoneNumber: selectedPhoneNumber,
-        statusTags: selectedStatuses,
+      const res = await fetch("/api/campaigns/create", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignName: campaignName || `${selectedStatus} Campaign`,
+          agentId: selectedAgent,
+          targetStatus: selectedStatus,
+          fromPhoneNumber: selectedPhoneNumber,
+        }),
       });
-      toast.success("Campaign created successfully");
-      onOpenChange(false);
-      // Reset form
-      setStep(1);
-      setSelectedFile(null);
-      setSelectedStatuses(["fresh"]);
-    } catch (error) {
-      console.error("Error creating campaign:", error);
-      toast.error("Failed to create campaign");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const toggleStatus = (status: string) => {
-    setSelectedStatuses(prev => 
-      prev.includes(status) 
-        ? prev.filter(s => s !== status)
-        : [...prev, status]
-    );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Create failed" }));
+        throw new Error(err.error || "Failed to create campaign");
+      }
+
+      toast.success("Campaign created and submitted to Bolna");
+      onOpenChange(false);
+      onCreated?.();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create campaign");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
-            Create New Campaign
-          </DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Create New Campaign</DialogTitle>
+          <DialogDescription className="sr-only">
+            Follow the steps to select target status, assign an agent, and create a campaign.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}
         <div className="flex items-center gap-2 mb-6">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
-              <div className={`
-                w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                ${s === step ? "bg-orange-500 text-white" : 
-                  s < step ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"}
-              `}>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                  ${s === step ? "bg-orange-500 text-white" : s < step ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"}`}
+              >
                 {s < step ? "✓" : s}
               </div>
               {s < 3 && (
@@ -247,43 +220,50 @@ export function CreateCampaignModal({
           ))}
         </div>
 
-        {/* Step 1: Target Customers */}
+        {/* Step 1: Target status */}
         {step === 1 && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium mb-2">Target Customers</h3>
+              <h3 className="text-base font-medium mb-1">Target Lead Status</h3>
               <p className="text-sm text-gray-500 mb-4">
-                Select which customer statuses to include in this campaign
+                Select which CRM status to target for this campaign
               </p>
             </div>
 
             <div className="space-y-3">
-              {statusOptions.map((option) => (
-                <div key={option.value} className="flex items-center space-x-3">
+              {statusOptions.map((opt) => (
+                <div key={opt.value} className="flex items-center space-x-3">
                   <Checkbox
-                    id={option.value}
-                    checked={selectedStatuses.includes(option.value)}
-                    onCheckedChange={() => toggleStatus(option.value)}
+                    id={opt.value}
+                    checked={selectedStatus === opt.value}
+                    onCheckedChange={() => setSelectedStatus(opt.value)}
                   />
-                  <Label htmlFor={option.value} className="cursor-pointer">
-                    {option.label}
+                  <Label htmlFor={opt.value} className="cursor-pointer">
+                    {opt.label}
                   </Label>
                 </div>
               ))}
             </div>
 
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3">
+              <Users className="h-5 w-5 text-blue-600 flex-shrink-0" />
               <p className="text-sm text-blue-800">
-                <strong>{customerCount}</strong> customers match the selected criteria
+                {previewCount === null ? (
+                  "Loading count..."
+                ) : (
+                  <>
+                    <strong>{previewCount}</strong> customer
+                    {previewCount !== 1 ? "s" : ""} match the selected status
+                  </>
+                )}
               </p>
             </div>
 
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={handleDownloadFromStatus}>
-                <Download className="h-4 w-4 mr-2" />
-                Download CSV
-              </Button>
-              <Button onClick={() => setStep(2)} disabled={selectedStatuses.length === 0}>
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setStep(2)}
+                disabled={!selectedStatus || previewCount === 0}
+              >
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
@@ -291,13 +271,13 @@ export function CreateCampaignModal({
           </div>
         )}
 
-        {/* Step 2: Campaign Settings */}
+        {/* Step 2: Agent + phone */}
         {step === 2 && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium mb-2">Campaign Settings</h3>
+              <h3 className="text-base font-medium mb-1">Campaign Settings</h3>
               <p className="text-sm text-gray-500 mb-4">
-                Configure the agent and caller ID for this campaign
+                Configure the agent and caller ID
               </p>
             </div>
 
@@ -306,24 +286,32 @@ export function CreateCampaignModal({
                 <p className="text-sm text-red-800">
                   <strong>Error:</strong> {dataError}
                 </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={loadData} 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadData}
                   className="mt-2"
                   disabled={isLoadingData}
                 >
                   {isLoadingData ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 mr-2" />
+                    "Retry"
                   )}
-                  Retry
                 </Button>
               </div>
             )}
 
             <div className="space-y-4">
+              <div>
+                <Label className="mb-2 block">Campaign Name (optional)</Label>
+                <Input
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder={`${selectedStatus} Campaign`}
+                />
+              </div>
+
               <div>
                 <Label className="mb-2 block">Select Agent</Label>
                 {isLoadingData ? (
@@ -332,9 +320,9 @@ export function CreateCampaignModal({
                     Loading agents...
                   </div>
                 ) : agents.length === 0 ? (
-                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                    No agents found. Please create an agent first in the AI Agents section.
-                  </div>
+                  <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                    No agents found. Please create an agent in your Bolna account first.
+                  </p>
                 ) : (
                   <Select value={selectedAgent} onValueChange={setSelectedAgent}>
                     <SelectTrigger>
@@ -342,7 +330,10 @@ export function CreateCampaignModal({
                     </SelectTrigger>
                     <SelectContent>
                       {agents.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
+                        <SelectItem
+                          key={agent.agent_id || agent.id}
+                          value={agent.agent_id || agent.id || ""}
+                        >
                           {agent.agent_name}
                         </SelectItem>
                       ))}
@@ -359,9 +350,9 @@ export function CreateCampaignModal({
                     Loading phone numbers...
                   </div>
                 ) : availablePhoneNumbers.length === 0 ? (
-                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                    No available phone numbers for this agent. Please purchase a phone number or assign one to this agent in the Settings section.
-                  </div>
+                  <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                    No phone numbers available. Please add a phone number in your Bolna account.
+                  </p>
                 ) : (
                   <Select value={selectedPhoneNumber} onValueChange={setSelectedPhoneNumber}>
                     <SelectTrigger>
@@ -369,8 +360,9 @@ export function CreateCampaignModal({
                     </SelectTrigger>
                     <SelectContent>
                       {availablePhoneNumbers.map((phone) => (
-                        <SelectItem key={phone.id} value={phone.phone_number}>
-                          {phone.phone_number} {phone.agent_id === selectedAgent ? "(Assigned)" : "(Available)"}
+                        <SelectItem key={phone.phone_number} value={phone.phone_number}>
+                          {phone.phone_number}
+                          {phone.agent_id === selectedAgent ? " (Assigned)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -384,8 +376,8 @@ export function CreateCampaignModal({
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
-              <Button 
-                onClick={() => setStep(3)} 
+              <Button
+                onClick={() => setStep(3)}
                 disabled={isLoadingData || !selectedAgent || !selectedPhoneNumber}
               >
                 Next
@@ -395,85 +387,57 @@ export function CreateCampaignModal({
           </div>
         )}
 
-        {/* Step 3: Upload CSV */}
+        {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium mb-2">Upload Contacts</h3>
+              <h3 className="text-base font-medium mb-1">Confirm Campaign</h3>
               <p className="text-sm text-gray-500 mb-4">
-                Upload a CSV file with phone numbers and optional variables
+                Review your campaign details before launching
               </p>
             </div>
 
-            <div 
-              className={`
-                border-2 border-dashed rounded-lg p-8 text-center
-                ${selectedFile ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400"}
-              `}
-            >
-              {selectedFile ? (
-                <div className="space-y-2">
-                  <FileText className="h-10 w-10 mx-auto text-green-600" />
-                  <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {(selectedFile.size / 1024).toFixed(1)} KB
-                  </p>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setSelectedFile(null)}
-                  >
-                    Remove file
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Upload className="h-10 w-10 mx-auto text-gray-400" />
-                  <div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Drag and drop your CSV file here, or click to browse
-                    </p>
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="csv-upload"
-                    />
-                    <Button variant="outline" size="sm" asChild>
-                      <label htmlFor="csv-upload" className="cursor-pointer">
-                        Choose File
-                      </label>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Need a template?</span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleDownloadTemplate}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Template
-                </Button>
+            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Campaign Name</span>
+                <span className="font-medium">{campaignName || `${selectedStatus} Campaign`}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Target Status</span>
+                <span className="font-medium capitalize">{selectedStatus.replace("_", " ")}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Contacts</span>
+                <span className="font-medium">{previewCount ?? "—"} customers</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Agent</span>
+                <span className="font-medium">
+                  {agents.find((a) => (a.agent_id || a.id) === selectedAgent)?.agent_name || selectedAgent}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">From Number</span>
+                <span className="font-medium">{selectedPhoneNumber}</span>
               </div>
             </div>
+
+            <p className="text-xs text-gray-500">
+              The backend will build a CSV from your CRM customers with status{" "}
+              <strong>{selectedStatus}</strong> and submit it to Bolna.
+            </p>
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
-              <Button 
-                onClick={handleCreate} 
-                disabled={!selectedFile || isLoading}
+              <Button
+                onClick={handleCreate}
+                disabled={isCreating}
                 className="bg-orange-500 hover:bg-orange-600"
               >
-                {isLoading ? (
+                {isCreating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Creating...

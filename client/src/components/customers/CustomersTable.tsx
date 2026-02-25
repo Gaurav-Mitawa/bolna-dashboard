@@ -1,56 +1,24 @@
 /**
  * Customers Table Component
- * Displays contact list with call history and metrics
- * Redesigned to match Image 1 style
+ * Displays CRM customers with status and conversation history
  * Fully responsive with mobile card view and desktop table view
  */
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Phone,
-  Eye,
-} from "lucide-react";
+import { Phone, Mail, Eye, Edit2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Contact } from "@/types";
+import type { CrmCustomer } from "@/api/crm";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Backend tag to UI status mapping (9 tags -> 4 UI statuses)
-type UIStatus = "purchased" | "converted" | "fresh" | "not_interested";
-
-
-
-const statusMap: Record<UIStatus, { label: string; className: string }> = {
-  purchased: {
-    label: "Purchased",
-    className: "bg-green-100 text-green-700 border-green-200",
-  },
-  converted: {
-    label: "Converted",
-    className: "bg-blue-100 text-blue-700 border-blue-200",
-  },
-  fresh: {
-    label: "Fresh",
-    className: "bg-orange-100 text-orange-700 border-orange-200",
-  },
-  not_interested: {
-    label: "Not Interested",
-    className: "bg-red-100 text-red-700 border-red-200",
-  },
+const statusMap: Record<string, { label: string; className: string }> = {
+  fresh: { label: "Fresh", className: "bg-orange-100 text-orange-700 border-orange-200" },
+  interested: { label: "Interested", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  not_interested: { label: "Not Interested", className: "bg-red-100 text-red-700 border-red-200" },
+  booked: { label: "Booked", className: "bg-green-100 text-green-700 border-green-200" },
+  NA: { label: "N/A", className: "bg-gray-100 text-gray-700 border-gray-200" },
 };
 
-// Map 9 backend tags to 4 UI statuses
-function mapTagToStatus(tag: string): UIStatus {
-  if (tag === "purchased") return "purchased";
-  if (tag === "converted" || tag === "follow_up_converted")
-    return "converted";
-  if (tag === "not_interested" || tag === "follow_up_not_interested")
-    return "not_interested";
-  // All other tags map to "fresh"
-  return "fresh";
-}
-
-// Format relative time
 function formatRelativeTime(dateString: string): string {
   if (!dateString) return "Never";
   const date = new Date(dateString);
@@ -59,7 +27,6 @@ function formatRelativeTime(dateString: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins} min ago`;
   if (diffHours < 24) return `${diffHours} hours ago`;
@@ -69,125 +36,103 @@ function formatRelativeTime(dateString: string): string {
 }
 
 interface CustomersTableProps {
-  data: Contact[];
-  onView: (contact: Contact) => void;
-  onEdit?: (contact: Contact) => void;
-  onDelete?: (contact: Contact) => void;
+  data: CrmCustomer[];
+  onView: (customer: CrmCustomer) => void;
+  onEdit?: (customer: CrmCustomer) => void;
+  onDelete?: (customer: CrmCustomer) => void;
 }
 
-// Mobile Card Component
 function ContactCard({
   contact,
   onView,
+  onEdit,
+  onDelete,
 }: {
-  contact: Contact;
-  onView: (contact: Contact) => void;
+  contact: CrmCustomer;
+  onView: (c: CrmCustomer) => void;
+  onEdit?: (c: CrmCustomer) => void;
+  onDelete?: (c: CrmCustomer) => void;
 }) {
-  const uiStatus = mapTagToStatus(contact.tag);
-  const statusConfig = statusMap[uiStatus];
-
+  const statusConfig = statusMap[contact.status] || statusMap.fresh;
+  const conversations = contact.pastConversations || [];
+  const lastConversation = conversations.length > 0 ? conversations[conversations.length - 1] : null;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-      {/* Header: Avatar + Name + Status */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold flex-shrink-0">
             {contact.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900 truncate">
-              {contact.name}
-            </p>
+            <p className="text-sm font-semibold text-gray-900 truncate">{contact.name}</p>
+            {contact.email && (
+              <p className="text-xs text-gray-500 truncate">{contact.email}</p>
+            )}
           </div>
         </div>
-        <Badge
-          className={cn("text-xs font-medium px-2 py-0.5 flex-shrink-0", statusConfig.className)}
-        >
-          {statusConfig.label}
-        </Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge
+            className={cn("text-xs font-medium px-2 py-0.5 flex-shrink-0 whitespace-nowrap", statusConfig.className)}
+          >
+            {statusConfig.label}
+          </Badge>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-blue-600" onClick={() => onEdit?.(contact)}>
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-red-600" onClick={() => onDelete?.(contact)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Contact Info */}
-      <div className="space-y-2 mb-3">
+      <div className="space-y-1 mb-3">
         <div className="flex items-center gap-2 text-sm text-gray-700">
           <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-          <span className="truncate">{contact.phone || "N/A"}</span>
+          <span className="truncate">{contact.phoneNumber || "N/A"}</span>
         </div>
-        <div className="flex items-center justify-between">
-          <Badge
-            className={cn(
-              "text-xs font-medium px-2 py-0.5",
-              contact.source === "bolna_inbound"
-                ? "bg-blue-100 text-blue-700 border-blue-200"
-                : "bg-green-100 text-green-700 border-green-200"
-            )}
-          >
-            {contact.source === "bolna_inbound" ? "Inbound" : "Outbound"}
-          </Badge>
-          {contact.last_call_date && (
-            <span className="text-xs text-gray-400">
-              {formatRelativeTime(contact.last_call_date)}
-            </span>
-          )}
-        </div>
+        {lastConversation && (
+          <p className="text-xs text-gray-400 pl-6">
+            Last: {formatRelativeTime(lastConversation.date)}
+          </p>
+        )}
       </div>
 
-      {/* Call Summary */}
-      {contact.last_call_summary && (
-        <div className="bg-gray-50 rounded-lg p-3 mb-3">
-          <p className="text-xs text-gray-500 font-medium mb-1 flex justify-between items-center">
-            <span>Last Call Summary</span>
-            {contact.last_call_agent && (
-              <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
-                {contact.last_call_agent}
-              </span>
-            )}
-          </p>
-          <p className="text-sm text-gray-700 line-clamp-2">
-            {contact.last_call_summary}
-          </p>
+      {lastConversation?.summary && (
+        <div className="bg-gray-50 rounded-lg p-3 mb-3 text-left">
+          <p className="text-xs text-gray-500 font-medium mb-1">Last Conversation</p>
+          <p className="text-sm text-gray-700 line-clamp-2">{lastConversation.summary}</p>
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onView(contact)}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 h-9"
-        >
-          <Eye className="h-4 w-4 mr-1.5" />
-          View Details
-        </Button>
-      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onView(contact)}
+        className="w-full bg-[#F15E04] hover:bg-[#d94f04] text-white border-[#F15E04] h-9"
+      >
+        <Eye className="h-4 w-4 mr-1.5" />
+        View Details
+      </Button>
     </div>
   );
 }
 
-export function CustomersTable({
-  data,
-  onView,
-}: CustomersTableProps) {
+export function CustomersTable({ data, onView, onEdit, onDelete }: CustomersTableProps) {
   const isMobile = useIsMobile();
 
-  // Mobile Card View
   if (isMobile) {
     return (
       <div className="space-y-3">
         {data.map((contact) => (
-          <ContactCard
-            key={contact.id}
-            contact={contact}
-            onView={onView}
-          />
+          <ContactCard key={contact._id} contact={contact} onView={onView} onEdit={onEdit} onDelete={onDelete} />
         ))}
       </div>
     );
   }
 
-  // Desktop Table View
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -204,62 +149,47 @@ export function CustomersTable({
                 Status
               </th>
               <th className="px-4 lg:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Last Call Summary
+                Last Conversation
               </th>
-              <th className="px-4 lg:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {data.map((row) => {
-              const uiStatus = mapTagToStatus(row.tag);
-              const statusConfig = statusMap[uiStatus];
-
+              const statusConfig = statusMap[row.status] || statusMap.fresh;
+              const conversations = row.pastConversations || [];
+              const lastConversation =
+                conversations.length > 0 ? conversations[conversations.length - 1] : null;
 
               return (
-                <tr
-                  key={row.id}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  {/* Name */}
-                  <td className="px-4 lg:px-6 py-4">
+                <tr key={row._id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 lg:px-6 py-4 text-left">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold flex-shrink-0">
                         {row.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {row.name}
-                        </p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">{row.name}</p>
+                        {row.email && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                            <Mail className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate max-w-[140px]">{row.email}</span>
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>
 
-                  {/* Contact */}
-                  <td className="px-4 lg:px-6 py-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="truncate">{row.phone || "N/A"}</span>
-                      </div>
-                      <div>
-                        <Badge
-                          className={cn(
-                            "text-xs font-medium px-2 py-0.5",
-                            row.source === "bolna_inbound"
-                              ? "bg-blue-100 text-blue-700 border-blue-200"
-                              : "bg-green-100 text-green-700 border-green-200"
-                          )}
-                        >
-                          {row.source === "bolna_inbound" ? "Inbound" : "Outbound"}
-                        </Badge>
-                      </div>
+                  <td className="px-4 lg:px-6 py-4 text-left">
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">{row.phoneNumber || "N/A"}</span>
                     </div>
                   </td>
 
-                  {/* Status */}
-                  <td className="px-4 lg:px-6 py-4">
+                  <td className="px-4 lg:px-6 py-4 text-left">
                     <Badge
                       className={cn("text-xs font-medium px-3 py-1", statusConfig.className)}
                     >
@@ -267,40 +197,52 @@ export function CustomersTable({
                     </Badge>
                   </td>
 
-                  {/* Last Call Summary */}
-                  <td className="px-4 lg:px-6 py-4">
-                    {row.last_call_summary ? (
+                  <td className="px-4 lg:px-6 py-4 text-left">
+                    {lastConversation?.summary ? (
                       <div className="max-w-[200px] lg:max-w-xs">
                         <p className="text-sm text-gray-700 line-clamp-2">
-                          {row.last_call_summary}
+                          {lastConversation.summary}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <p className="text-xs text-gray-400">
-                            {formatRelativeTime(row.last_call_date || "")}
-                          </p>
-                          {row.last_call_agent && (
-                            <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-purple-50 text-purple-700 border-purple-100">
-                              {row.last_call_agent}
-                            </Badge>
-                          )}
-                        </div>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {formatRelativeTime(lastConversation.date)}
+                        </p>
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-400">No calls yet</span>
+                      <span className="text-sm text-gray-400">No conversations yet</span>
                     )}
                   </td>
 
-                  {/* Actions */}
-                  <td className="px-4 lg:px-6 py-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onView(row)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
+                  <td className="px-4 lg:px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onView(row)}
+                        className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEdit?.(row)}
+                        className="h-8 w-8 text-slate-500 hover:bg-slate-50"
+                        title="Edit Lead"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDelete?.(row)}
+                        className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        title="Delete Lead"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+
+                    </div>
                   </td>
                 </tr>
               );

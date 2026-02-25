@@ -1,49 +1,57 @@
 
 
-const BOLNA_API_BASE = 'https://api.bolna.ai';
+const BOLNA_API_BASE = '/api/bolna/proxy';
 
 /**
- * Get Bolna API key from environment variable
+ * Get Bolna API key from environment variable (LEGACY - used as fallback)
  */
 export function getBolnaApiKey(): string | null {
-  return import.meta.env.BOLNA_API_KEY || import.meta.env.VITE_BOLNA_API_KEY || null;
+  return import.meta.env.VITE_BOLNA_API_KEY || null;
 }
 
 /**
  * Check if Bolna API key is configured
+ * Now always returns true because the backend handles validation
  */
 export function isBolnaConfigured(): boolean {
-  const key = getBolnaApiKey();
-  return !!key && key.length > 10;
+  return true;
 }
 
 /**
  * Bolna API fetch wrapper
+ * Proxies calls through the backend to use the user's encrypted key.
  */
 async function bolnaFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const apiKey = getBolnaApiKey();
+  // Construct proxy URL with endpoint as a query parameter
+  const url = new URL(BOLNA_API_BASE, window.location.origin);
+  url.searchParams.append("endpoint", endpoint);
 
-  if (!apiKey) {
-    throw new Error('Bolna API key not configured. Please add VITE_BOLNA_API_KEY to your .env file.');
+  // If there are existing query params in the endpoint, we need to extract them
+  // and add them as top-level params for the proxy to handle them via req.query
+  if (endpoint.includes("?")) {
+    const [pathPart, queryPart] = endpoint.split("?");
+    url.searchParams.set("endpoint", pathPart);
+    const nestedParams = new URLSearchParams(queryPart);
+    nestedParams.forEach((val, key) => {
+      url.searchParams.append(key, val);
+    });
   }
 
-  const url = `${BOLNA_API_BASE}${endpoint}`;
-
-  const response = await fetch(url, {
-    ...options,
+  const response = await fetch(url.toString(), {
+    method: options.method || "GET",
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       ...options.headers,
     },
+    body: options.body,
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `API Error: ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || error.message || `API Error: ${response.status}`);
   }
 
   return response.json();

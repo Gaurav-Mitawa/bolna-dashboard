@@ -6,20 +6,14 @@ import { Call } from "../models/Call.js";
 
 const BOLNA_API = "https://api.bolna.ai";
 
-function getApiKey(): string {
-    const key = process.env.BOLNA_API_KEY;
-    if (!key) throw new Error("BOLNA_API_KEY not set in .env");
-    return key;
-}
-
-async function bolnaGet<T>(endpoint: string): Promise<T> {
+async function bolnaGet<T>(endpoint: string, apiKey: string): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     try {
         const res = await fetch(`${BOLNA_API}${endpoint}`, {
             headers: {
-                Authorization: `Bearer ${getApiKey()}`,
+                Authorization: `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
             },
             signal: controller.signal
@@ -84,10 +78,10 @@ export interface NewCall {
 /**
  * Poll Bolna for new completed calls that haven't been processed yet.
  */
-export async function pollNewCalls(): Promise<NewCall[]> {
+export async function pollNewCalls(userId: string, apiKey: string): Promise<NewCall[]> {
     // 1. Get all agents
-    const agents = await bolnaGet<BolnaAgent[]>("/v2/agent/all");
-    console.log(`[Poller] Found ${agents.length} agents`);
+    const agents = await bolnaGet<BolnaAgent[]>("/v2/agent/all", apiKey);
+    console.log(`[Poller] [User ${userId}] Found ${agents.length} agents`);
 
     // Create a map of agent_id -> agent_name
     const agentMap = new Map<string, string>();
@@ -102,10 +96,11 @@ export async function pollNewCalls(): Promise<NewCall[]> {
 
         while (hasMore) {
             try {
-                console.log(`[Poller] Fetching calls for agent ${agent.agent_name} (Page ${page})...`);
+                console.log(`[Poller] [User ${userId}] Fetching calls for agent ${agent.agent_name} (Page ${page})...`);
                 // Removed status=completed to get ALL history (failed, busy, etc.)
                 const execResponse = await bolnaGet<ExecutionsResponse>(
-                    `/v2/agent/${agent.id}/executions?page_size=50&page_number=${page}`
+                    `/v2/agent/${agent.id}/executions?page_size=50&page_number=${page}`,
+                    apiKey
                 );
 
                 const executions = execResponse.data || [];
@@ -113,7 +108,7 @@ export async function pollNewCalls(): Promise<NewCall[]> {
                 if (!executions.length) hasMore = false; // Safety check
 
                 for (const exec of executions) {
-                    // Check if already in our DB and processed
+                    // Check if already in our DB and processed for THIS user
                     const exists = await Call.findOne({ call_id: exec.id });
                     if (exists && exists.processed) continue;
 
@@ -169,8 +164,8 @@ export async function pollNewCalls(): Promise<NewCall[]> {
  * Sync calls for a specific phone number across all agents.
  * This is useful for on-demand population of a customer's history.
  */
-export async function syncCallsForPhone(phoneNumber: string): Promise<NewCall[]> {
-    const agents = await bolnaGet<BolnaAgent[]>("/v2/agent/all");
+export async function syncCallsForPhone(phoneNumber: string, apiKey: string): Promise<NewCall[]> {
+    const agents = await bolnaGet<BolnaAgent[]>("/v2/agent/all", apiKey);
     const agentMap = new Map<string, string>();
     agents.forEach(a => agentMap.set(a.id, a.agent_name));
 
@@ -186,7 +181,8 @@ export async function syncCallsForPhone(phoneNumber: string): Promise<NewCall[]>
         while (hasMore && page <= 3) { // Limit to 3 pages per agent for on-demand sync (150 calls)
             try {
                 const execResponse = await bolnaGet<ExecutionsResponse>(
-                    `/v2/agent/${agent.id}/executions?page_size=50&page_number=${page}`
+                    `/v2/agent/${agent.id}/executions?page_size=50&page_number=${page}`,
+                    apiKey
                 );
 
                 const executions = execResponse.data || [];

@@ -1,0 +1,62 @@
+# Campaign Play/Pause Buttons + Pagination
+
+Add a **Stop (Pause)** button for scheduled/running campaigns using Bolna's `POST /batches/{batch_id}/stop` API. Add **pagination** to the campaigns list.
+
+---
+
+## How Campaigns Currently Work
+
+```
+1. User creates campaign → Backend builds CSV from CRM leads → Uploads to Bolna → Saves as "draft"
+2. User clicks "Activate" → Schedule dialog opens → Backend calls Bolna schedule API → Status = "scheduled"
+3. Bolna runs the batch at scheduled time → Calls are made to leads
+4. Status syncs: scheduled → running → completed
+```
+
+> [!IMPORTANT]
+> Bolna's Stop API (`POST /batches/{batch_id}/stop`) **permanently stops** the batch — it cannot be resumed. So the "Pause" button is really a **Stop** button. Once stopped, the campaign is done. To re-run, user must create a new campaign.
+
+---
+
+## Proposed Changes
+
+### Backend
+
+#### [MODIFY] [Campaign.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/models/Campaign.ts)
+- Add `"stopped"` to the status enum
+
+#### [MODIFY] [bolnaService.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/services/bolnaService.ts)
+- Add `stopBatch(user, batchId)` function that calls `POST /batches/{batchId}/stop`
+
+#### [MODIFY] [campaignRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/campaignRoutes.ts)
+- Add `POST /api/campaigns/:id/stop` route
+  - Finds campaign by ID + userId
+  - Only allows stopping if status is `scheduled` or `running`
+  - Calls `bolnaService.stopBatch()`
+  - Updates campaign status to `"stopped"` in MongoDB
+- Add pagination to `GET /api/campaigns` (page, limit query params, return total count)
+- Add `"stopped"` to the statusMap in the status sync route
+
+---
+
+### Frontend
+
+#### [MODIFY] [index.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/campaigns/index.tsx)
+- Add `"stopped"` to `statusConfig` with a red/gray badge style
+- Add `handleStopCampaign(id)` function that calls `POST /api/campaigns/:id/stop`
+- Add a **Stop** button (⏹) in the Actions column for `scheduled` and `running` campaigns
+- Add pagination state (`page`, `PAGE_SIZE = 10`) and controls (Previous/Next)
+- Update fetch to include `?page=X&limit=Y` query params
+
+---
+
+## Verification Plan
+
+### Manual Verification
+1. Run `npm run dev` to start the app
+2. Navigate to `/campaigns`
+3. Verify pagination appears when there are campaigns (Previous/Next buttons, page number)
+4. Create a new campaign, schedule it, then click the **Stop** button
+5. Verify the campaign status changes to "Stopped" with appropriate badge styling
+6. Verify the stop button disappears after stopping (only View/Edit actions remain)
+7. Verify pagination controls navigate between pages correctly

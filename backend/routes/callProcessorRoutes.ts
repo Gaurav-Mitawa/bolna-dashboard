@@ -23,13 +23,16 @@ router.post("/internal/process-calls", async (_req: Request, res: Response) => {
 
 /**
  * GET /api/call-bookings
- * Returns calls where LLM detected a booking (is_booked = true).
+ * Returns calls where LLM detected a booking (is_booked = true) OR intent is "interested".
  * Query params: direction (inbound/outbound)
  */
 router.get("/call-bookings", async (req: Request, res: Response) => {
     try {
         const query: any = {
-            "llm_analysis.booking.is_booked": true,
+            $or: [
+                { "llm_analysis.booking.is_booked": true },
+                { "llm_analysis.intent": "interested" }
+            ]
         };
 
         if (req.query.direction) {
@@ -47,14 +50,14 @@ router.get("/call-bookings", async (req: Request, res: Response) => {
 
 /**
  * GET /api/queries-calls
- * Returns processed calls where LLM intent = "queries".
+ * Returns ALL LLM-processed calls (all intents).
  * Query params: direction (inbound/outbound)
  */
 router.get("/queries-calls", async (req: Request, res: Response) => {
     try {
         const query: any = {
             processed: true,
-            "llm_analysis.intent": "queries",
+            llm_analysis: { $ne: null },
         };
 
         if (req.query.direction) {

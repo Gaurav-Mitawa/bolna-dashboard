@@ -1,0 +1,34 @@
+# Subscription & Billing Fixes — Walkthrough
+
+## Changes Made
+
+### 1. Developer Bypass — Production Safe
+The "Skip Payment (Developer Bypass)" button in [Subscribe.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Subscribe.tsx) is now wrapped in `import.meta.env.DEV`. It only appears in **development mode** and is completely stripped from production builds. No manual code removal needed.
+
+### 2. 7-Day Free Trial Button
+A new **"Start 7-Day Free Trial"** button was added to the Subscribe page. It only appears when:
+- User has logged in and configured their API key (`bolnaKeySet === true`)
+- User has **never** started a trial (`trialStartedAt === null`)
+- User is not already subscribed
+
+**Backend**: New `POST /api/subscribe/start-trial` route in [subscriptionRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/subscriptionRoutes.ts) with double server-side checks.
+
+**Session**: `trialStartedAt` is now exposed via `/api/auth/me` ([authRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/authRoutes.ts)) and added to the [SessionUser](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/contexts/AuthContext.tsx) interface.
+
+### 3. Billing Expiry Toast
+[Billing.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Billing.tsx) now shows toast notifications on page load:
+- 🔴 **Expired** → error toast: "Your subscription has expired."
+- 🟡 **≤ 3 days left** → warning toast: "Expires in X days. Renew now."
+- 🔵 **≤ 7 days left** → info toast: "Heads up — expires in X days."
+
+Uses a `useRef` to prevent duplicate toasts on re-renders.
+
+## Files Modified
+
+| File | Change |
+|---|---|
+| [authRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/authRoutes.ts) | Added `trialStartedAt` to `/me` response |
+| [AuthContext.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/contexts/AuthContext.tsx) | Added `trialStartedAt` to [SessionUser](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/contexts/AuthContext.tsx#8-23) |
+| [subscriptionRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/subscriptionRoutes.ts) | New `POST /start-trial` endpoint |
+| [Subscribe.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Subscribe.tsx) | 7-day trial button + DEV-only bypass |
+| [Billing.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Billing.tsx) | Expiry toast via `useEffect` |

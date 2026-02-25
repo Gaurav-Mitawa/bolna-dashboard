@@ -18,6 +18,7 @@ import {
   ChevronRight,
   CalendarCheck,
   Menu,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
@@ -40,8 +41,9 @@ const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Campaigns", href: "/campaigns", icon: Megaphone },
-  { label: "Booking", href: "/bookings", icon: CalendarCheck },
+  { label: "Bookings", href: "/bookings", icon: CalendarCheck },
   { label: "Billing", href: "/billing", icon: Wallet },
+  { label: "Subscription", href: "/subscription", icon: CreditCard },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -98,8 +100,8 @@ export default function AppShell({ children }: AppShellProps) {
           <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
             <Mic className="h-5 w-5 text-white" />
           </div>
-          <span className="font-semibold text-lg hidden sm:block">Bolna Dashboard</span>
-          <span className="font-semibold text-lg sm:hidden">Bolna</span>
+          <span className="font-semibold text-lg hidden sm:block">ClusterX Dashboard</span>
+          <span className="font-semibold text-lg sm:hidden">ClusterX</span>
         </div>
       </div>
 
@@ -185,9 +187,9 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
           <div className="mt-3 px-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-400">Wallet Balance</span>
-              <span className="text-green-400 font-medium">
-                ₹{user.wallet?.toFixed(2) || '0.00'}
+              <span className="text-gray-400">Subscription</span>
+              <span className={`font-medium ${user.isSubscriptionActive ? 'text-green-400' : 'text-red-400'}`}>
+                {user.subscriptionStatus === 'active' ? 'Active' : user.subscriptionStatus === 'expired' ? 'Expired' : 'Inactive'}
               </span>
             </div>
           </div>
@@ -238,7 +240,7 @@ export default function AppShell({ children }: AppShellProps) {
               <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center">
                 <Mic className="h-4 w-4 text-white" />
               </div>
-              <span className="font-semibold text-base hidden sm:block">Bolna</span>
+              <span className="font-semibold text-base hidden sm:block">ClusterX</span>
             </div>
           </div>
 

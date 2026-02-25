@@ -21,7 +21,7 @@ Given the transcript below, return ONLY a valid JSON object with exactly these f
 
 {
   "summary": "2-3 sentence summary of the call",
-  "intent": "one of: queries / booked / not_interested",
+  "intent": "one of: queries / booked / interested / not_interested / follow_up",
   "call_direction": "inbound or outbound - infer from who initiated the conversation and context",
   "booking": {
     "is_booked": true or false,
@@ -33,8 +33,10 @@ Given the transcript below, return ONLY a valid JSON object with exactly these f
 
 Intent classification rules:
 - "booked": The caller confirmed a booking, appointment, reservation, or scheduled something.
+- "interested": The caller verbally indicated strong interest, asked for quotes, next steps, or requested a callback, but did not commit to a specific booking date/time yet.
+- "follow_up": The caller requested to be contacted again, asked for a follow-up call, or the agent promised to call back at a later time.
 - "not_interested": The caller explicitly declined, refused, said no thanks, or expressed disinterest.
-- "queries": Everything else — questions, inquiries, information requests, general conversations, complaints, follow-ups.
+- "queries": Everything else — general questions, inquiries, information requests.
 
 Return ONLY the JSON. No explanation. No markdown. No extra text.`;
 

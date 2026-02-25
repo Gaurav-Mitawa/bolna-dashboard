@@ -23,11 +23,18 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api/internal": "http://localhost:5000",
-      "/api/call-bookings": "http://localhost:5000",
-      "/api/processed-calls": "http://localhost:5000",
-      "/api/queries-calls": "http://localhost:5000",
-      "/api/contacts": "http://localhost:5000",
+      // Proxy ALL /api requests to the Express backend on port 5000
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+      },
+      // Proxy webhooks too
+      "/webhooks": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+      },
     },
     fs: {
       allow: [".."],

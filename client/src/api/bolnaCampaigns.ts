@@ -250,13 +250,12 @@ export async function createCampaign(data: CreateCampaignData): Promise<Campaign
       formData.append("retry_config", JSON.stringify(data.retryConfig));
     }
 
-    // Use fetch directly since we need FormData
-    const apiKey = import.meta.env.BOLNA_API_KEY || import.meta.env.VITE_BOLNA_API_KEY;
-    const response = await fetch("https://api.bolna.ai/batches", {
+    // Use batchesApi from bolnaApi which now uses the proxy
+    // Note: We need to ensure batchesApi.create exists or implement it
+    // For now, let's use a simpler approach that aligns with our proxy
+    const response = await fetch(`/api/bolna/proxy?endpoint=/batches`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
+      // Proxy will attach the API key
       body: formData,
     });
 

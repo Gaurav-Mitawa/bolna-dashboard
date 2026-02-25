@@ -21,16 +21,10 @@ import {
   CalendarDays,
   Loader2,
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachWeekOfInterval, endOfWeek, addMonths, subMonths } from "date-fns";
+import { format, addMonths, subMonths } from "date-fns";
 
 type ViewMode = "calendar" | "list";
 
-interface WeekData {
-  weekNumber: number;
-  startDate: Date;
-  endDate: Date;
-  dateRange: string;
-}
 
 export default function BookingsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
@@ -54,26 +48,7 @@ export default function BookingsPage() {
 
   const isLoading = isLoadingAll || isLoadingBooked;
 
-  // Calculate weeks for the current month
-  const weeks = useMemo<WeekData[]>(() => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
 
-    const weekStarts = eachWeekOfInterval(
-      { start: monthStart, end: monthEnd },
-      { weekStartsOn: 1 }
-    );
-
-    return weekStarts.map((weekStart, index) => {
-      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-      return {
-        weekNumber: index + 1,
-        startDate: weekStart,
-        endDate: weekEnd,
-        dateRange: `${format(weekStart, "dd MMM")} - ${format(weekEnd, "dd MMM yyyy")}`,
-      };
-    });
-  }, [currentDate]);
 
   // Filter bookings based on search query
   const filteredBookings = useMemo(() => {
@@ -100,21 +75,7 @@ export default function BookingsPage() {
     );
   }, [bookedCalls, searchQuery]);
 
-  // Group booked calls by week for calendar view
-  const bookingsByWeek = useMemo(() => {
-    const grouped = new Map<number, Booking[]>();
 
-    weeks.forEach((week) => {
-      const weekBookings = filteredBooked.filter((booking) => {
-        if (!booking.service_date) return false;
-        const bookingDate = new Date(booking.service_date);
-        return bookingDate >= week.startDate && bookingDate <= week.endDate;
-      });
-      grouped.set(week.weekNumber, weekBookings);
-    });
-
-    return grouped;
-  }, [filteredBooked, weeks]);
 
   // Count today's bookings
   const todayBookings = useMemo(() => {
@@ -217,19 +178,11 @@ export default function BookingsPage() {
 
       {/* Calendar View — Only booked calls */}
       {!isLoading && viewMode === "calendar" && (
-        <div className="space-y-4 sm:space-y-6">
-          {weeks.map((week) => (
-            <CalendarView
-              key={week.weekNumber}
-              weekNumber={week.weekNumber}
-              dateRange={week.dateRange}
-              startDate={week.startDate}
-              endDate={week.endDate}
-              bookings={bookingsByWeek.get(week.weekNumber) || []}
-              onBookingClick={(booking) => setSelectedBooking(booking)}
-            />
-          ))}
-        </div>
+        <CalendarView
+          currentDate={currentDate}
+          bookings={filteredBooked}
+          onBookingClick={(booking) => setSelectedBooking(booking)}
+        />
       )}
 
       {/* List View — Booked + Queries calls */}

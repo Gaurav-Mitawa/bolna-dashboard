@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface ICall extends Document {
     call_id: string;
+    userId: string;
     agent_id: string;
     caller_number: string;
     call_duration: number;
@@ -35,7 +36,8 @@ export interface ICall extends Document {
 }
 
 const CallSchema = new Schema<ICall>({
-    call_id: { type: String, required: true, unique: true, index: true },
+    call_id: { type: String, required: true, index: true },
+    userId: { type: String, required: true, index: true },
     agent_id: { type: String, required: true },
     caller_number: { type: String, default: "" },
     call_duration: { type: Number, default: 0 },

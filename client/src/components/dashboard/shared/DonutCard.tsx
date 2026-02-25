@@ -5,8 +5,6 @@
  */
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 // =============================================================================
 // PROPS INTERFACE
@@ -37,13 +35,6 @@ export function DonutCard({ title, subheader, data, emptyMessage }: DonutCardPro
         {/* Header: Title (Left) + Download Icon (Right) */}
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm sm:text-base font-semibold text-slate-800">{title}</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-slate-300 hover:text-slate-500"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
         </div>
 
         {/* Subheader */}
@@ -71,13 +62,6 @@ export function DonutCard({ title, subheader, data, emptyMessage }: DonutCardPro
       {/* Header: Title (Left) + Download Icon (Right) */}
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm sm:text-base font-semibold text-slate-800">{title}</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-slate-300 hover:text-slate-500"
-        >
-          <Download className="h-4 w-4" />
-        </Button>
       </div>
 
       {/* Subheader */}

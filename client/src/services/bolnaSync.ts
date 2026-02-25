@@ -267,7 +267,7 @@ export async function syncContactsFromBolna(
       try {
         // Sort by date descending (newest first)
         phoneExecutions.sort(
-          (a, b) =>
+          (a: BolnaExecution, b: BolnaExecution) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
@@ -280,7 +280,7 @@ export async function syncContactsFromBolna(
         // Calculate aggregated metrics
         const callCount = phoneExecutions.length;
         const totalDuration = phoneExecutions.reduce(
-          (sum, ex) => sum + (ex.conversation_time || 0),
+          (sum: number, ex: BolnaExecution) => sum + (ex.conversation_time || 0),
           0
         );
         const lastCallDate = phoneExecutions[0].created_at;

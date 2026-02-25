@@ -1,6 +1,6 @@
 # LLM Intent Pipeline Integration
 
-Replace client-side keyword matching with the existing Gemini LLM backend pipeline. Automatically process new Bolna call executions and surface LLM-derived intent (`queries`, `booked`, `not_interested`) on the Dashboard and Bookings pages.
+Replace client-side keyword matching with the existing Gemini LLM backend pipeline. Automatically process new Bolna call executions and surface LLM-derived intent (`queries`, `booked`, `not_interested`, `follow_up`, `interested`) on the Dashboard and Bookings pages.
 
 ## User Review Required
 

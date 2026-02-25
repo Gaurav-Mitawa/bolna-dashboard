@@ -2,25 +2,20 @@
  * Voice Agent Management Page
  * Main page for managing AI voice agents
  */
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Mic, Plus, Download } from "lucide-react";
+import { Mic } from "lucide-react";
 import { AgentStats } from "@/components/agents/AgentStats";
 import { AgentList } from "@/components/agents/AgentList";
-import { CreateAgentModal } from "@/components/agents/CreateAgentModal";
 import {
   getAllAgents,
   getAgentsStats,
-  createAgent,
   updateAgentStatus,
-  CreateAgentData,
 } from "@/api/bolnaAgents";
 import { toast } from "sonner";
 
 export default function VoiceAgentPage() {
   const queryClient = useQueryClient();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Fetch all agents
   const {
@@ -42,20 +37,7 @@ export default function VoiceAgentPage() {
     queryFn: getAgentsStats,
   });
 
-  // Create agent mutation
-  const createMutation = useMutation({
-    mutationFn: createAgent,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["voice-agents"] });
-      queryClient.invalidateQueries({ queryKey: ["agents-stats"] });
-      toast.success("Voice agent created successfully");
-      setIsCreateModalOpen(false);
-    },
-    onError: (error) => {
-      console.error("Error creating agent:", error);
-      toast.error("Failed to create voice agent");
-    },
-  });
+
 
   // Update agent status mutation
   const updateStatusMutation = useMutation({
@@ -81,9 +63,7 @@ export default function VoiceAgentPage() {
     return () => clearInterval(interval);
   }, [refetchAgents, refetchStats]);
 
-  const handleCreateAgent = async (data: CreateAgentData) => {
-    await createMutation.mutateAsync(data);
-  };
+
 
   const handleToggleStatus = (agentId: string, isActive: boolean) => {
     updateStatusMutation.mutate({ agentId, isActive });
@@ -94,10 +74,7 @@ export default function VoiceAgentPage() {
     // TODO: Implement agent settings modal/page
   };
 
-  const handleExportReport = () => {
-    toast.info("Exporting agent report...");
-    // TODO: Implement CSV/JSON export
-  };
+
 
   return (
     <div className="p-6 space-y-6">
@@ -112,26 +89,12 @@ export default function VoiceAgentPage() {
             <p className="text-gray-500">AI-powered voice agents for customer interactions</p>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={handleExportReport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button 
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-orange-500 hover:bg-orange-600"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Voice Agent
-          </Button>
-        </div>
       </div>
 
       {/* Stats Section */}
-      <AgentStats 
-        stats={stats || null} 
-        isLoading={isLoadingStats} 
+      <AgentStats
+        stats={stats || null}
+        isLoading={isLoadingStats}
       />
 
       {/* Agent List Section */}
@@ -140,13 +103,6 @@ export default function VoiceAgentPage() {
         onToggleStatus={handleToggleStatus}
         onOpenSettings={handleOpenSettings}
         isLoading={isLoadingAgents || updateStatusMutation.isPending}
-      />
-
-      {/* Create Agent Modal */}
-      <CreateAgentModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        onCreate={handleCreateAgent}
       />
     </div>
   );

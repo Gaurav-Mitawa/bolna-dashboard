@@ -13,7 +13,7 @@ export interface Booking {
   service_date: string;   // YYYY-MM-DD
   service_time: string;   // HH:MM AM/PM
   status: "confirmed" | "pending" | "completed" | "cancelled";
-  intent_category: "booked" | "queries" | "not_interested";
+  intent_category: "booked" | "queries" | "not_interested" | "interested" | "follow_up";
   location: string;
   amount: string;
   revenue?: number;
@@ -69,7 +69,10 @@ function callToBooking(call: RawCall): Booking {
   // Map intent → booking status
   let status: Booking["status"] = "pending";
   if (intent === "booked") status = "confirmed";
+  else if (intent === "interested") status = "pending";
+  else if (intent === "follow_up") status = "pending";
   else if (intent === "queries") status = "pending";
+  else if (intent === "not_interested") status = "cancelled";
 
   // Extract date/time from LLM analysis or fallback to call timestamp
   let serviceDate = analysis?.booking?.date || "";
@@ -126,7 +129,7 @@ export async function getBookedCalls(): Promise<Booking[]> {
 }
 
 /**
- * Fetch queries calls (intent = "queries")
+ * Fetch ALL LLM-processed calls (all intents for List view)
  */
 export async function getQueriesCalls(): Promise<Booking[]> {
   const res = await fetch(`${API_BASE_URL}/api/queries-calls`);
@@ -136,18 +139,13 @@ export async function getQueriesCalls(): Promise<Booking[]> {
 }
 
 /**
- * Fetch ALL bookings (booked + queries) for the bookings page.
- * Calendar view uses only booked; List view uses both.
+ * Fetch ALL processed calls for the List view.
+ * Since /api/queries-calls now returns all intents, we use it directly.
  */
 export async function getBookings(
   _filters?: BookingFilters
 ): Promise<Booking[]> {
-  const [booked, queries] = await Promise.all([
-    getBookedCalls(),
-    getQueriesCalls(),
-  ]);
-
-  const all = [...booked, ...queries];
+  const all = await getQueriesCalls();
 
   // Sort by date descending (newest first)
   all.sort(

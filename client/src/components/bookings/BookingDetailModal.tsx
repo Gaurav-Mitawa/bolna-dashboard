@@ -18,6 +18,14 @@ const intentBadge: Record<string, { label: string; className: string }> = {
     label: "Booked",
     className: "bg-green-100 text-green-700 border-green-300",
   },
+  interested: {
+    label: "Interested",
+    className: "bg-blue-100 text-blue-700 border-blue-300",
+  },
+  follow_up: {
+    label: "Follow Up",
+    className: "bg-purple-100 text-purple-700 border-purple-300",
+  },
   queries: {
     label: "Queries",
     className: "bg-amber-100 text-amber-700 border-amber-300",
@@ -116,10 +124,10 @@ export function BookingDetailModal({ open, onOpenChange, booking }: BookingDetai
               <span className="text-sm text-gray-500">Status:</span>
               <span
                 className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${booking.status === "confirmed"
-                    ? "bg-green-100 text-green-700 border-green-200"
-                    : booking.status === "pending"
-                      ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  ? "bg-green-100 text-green-700 border-green-200"
+                  : booking.status === "pending"
+                    ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                    : "bg-gray-100 text-gray-700 border-gray-200"
                   }`}
               >
                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}

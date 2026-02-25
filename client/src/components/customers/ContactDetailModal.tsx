@@ -1,105 +1,48 @@
 /**
- * Contact Detail Modal Component (Image 2 Style)
- * History and Action tabs
- * Orange header with customer info
+ * Contact Detail Modal Component
+ * Shows CRM customer details with pastConversations history
  */
 
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Phone,
-  MapPin,
+  Mail,
   Users,
   FileText,
   Zap,
-  Headphones,
+  MessageSquare,
   Clock,
   ShoppingCart,
 } from "lucide-react";
-import type { Contact } from "@/types";
-import type { CallHistoryItem } from "@/types";
+import type { CrmCustomer } from "@/api/crm";
 import { cn } from "@/lib/utils";
 
 interface ContactDetailModalProps {
-  contact: Contact | null;
+  contact: CrmCustomer | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCallClick: (call: CallHistoryItem) => void;
 }
 
-// Format date for display
+const statusMap: Record<string, { label: string; className: string }> = {
+  fresh: { label: "Fresh", className: "bg-orange-100 text-orange-700 border-orange-200" },
+  interested: { label: "Interested", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  not_interested: { label: "Not Interested", className: "bg-red-100 text-red-700 border-red-200" },
+  booked: { label: "Booked", className: "bg-green-100 text-green-700 border-green-200" },
+  NA: { label: "N/A", className: "bg-gray-100 text-gray-700 border-gray-200" },
+};
+
 function formatDate(dateString: string): string {
   if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
+  return new Date(dateString).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 
-
-// Get status badge styling
-function getStatusBadgeStyle(tag: string): string {
-  const statusMap: Record<string, string> = {
-    purchased: "bg-green-100 text-green-700 border-green-200",
-    converted: "bg-blue-100 text-blue-700 border-blue-200",
-    fresh: "bg-orange-100 text-orange-700 border-orange-200",
-    not_interested: "bg-red-100 text-red-700 border-red-200",
-  };
-  return statusMap[tag] || "bg-gray-100 text-gray-700 border-gray-200";
-}
-
-// Get status label
-function getStatusLabel(tag: string): string {
-  const labelMap: Record<string, string> = {
-    purchased: "Purchased",
-    converted: "Converted",
-    fresh: "Fresh",
-    not_interested: "Not Interested",
-  };
-  return labelMap[tag] || tag;
-}
-
-// Get call type badge styling
-function getCallTypeStyle(type?: string): string {
-  switch (type?.toLowerCase()) {
-    case "inbound":
-      return "bg-purple-100 text-purple-700 border-purple-200";
-    case "outbound":
-      return "bg-blue-100 text-blue-700 border-blue-200";
-    default:
-      return "bg-gray-100 text-gray-700 border-gray-200";
-  }
-}
-
-// Get intent badge styling
-function getIntentStyle(intent?: string): string {
-  if (!intent) return "bg-gray-100 text-gray-700 border-gray-200";
-  const intent_lower = intent.toLowerCase();
-
-  if (intent_lower.includes("not_interested") || intent_lower.includes("cancelled")) {
-    return "bg-red-100 text-red-700 border-red-200";
-  }
-
-  if (intent_lower.includes("booking") || intent_lower.includes("interested") || intent_lower.includes("purchased") || intent_lower.includes("converted")) {
-    return "bg-green-100 text-green-700 border-green-200";
-  }
-
-  if (intent_lower.includes("follow_up") || intent_lower.includes("query")) {
-    return "bg-amber-100 text-amber-700 border-amber-200";
-  }
-
-  return "bg-gray-100 text-gray-700 border-gray-200";
-}
-
-// Format relative time
 function formatRelativeTime(dateString: string): string {
   if (!dateString) return "";
   const date = new Date(dateString);
@@ -108,7 +51,6 @@ function formatRelativeTime(dateString: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins} min ago`;
   if (diffHours < 24) return `${diffHours} hours ago`;
@@ -121,18 +63,18 @@ export function ContactDetailModal({
   contact,
   open,
   onOpenChange,
-  onCallClick,
 }: ContactDetailModalProps) {
   const [activeTab, setActiveTab] = useState("history");
 
   if (!contact) return null;
 
-  const callHistory: CallHistoryItem[] = contact.call_history || [];
+  const statusConfig = statusMap[contact.status] || statusMap.fresh;
+  const conversations = contact.pastConversations || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
-        {/* Orange Header - Image 2 Style */}
+        {/* Orange Header */}
         <div className="bg-orange-500 text-white px-6 py-5">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
@@ -140,23 +82,26 @@ export function ContactDetailModal({
             </div>
             <div className="flex-1">
               <h2 className="text-2xl font-bold">{contact.name}</h2>
-              <div className="flex items-center gap-6 mt-2 text-sm text-white/90">
+              <div className="flex items-center gap-4 mt-2 text-sm text-white/90 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4" />
-                  <span>{contact.phone || "N/A"}</span>
+                  <span>{contact.phoneNumber || "N/A"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <Badge className={cn("text-xs border-0", getStatusBadgeStyle(contact.tag))}>
-                    {getStatusLabel(contact.tag)}
-                  </Badge>
-                </div>
+                {contact.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    <span>{contact.email}</span>
+                  </div>
+                )}
+                <Badge className={cn("text-xs border-0", statusConfig.className)}>
+                  {statusConfig.label}
+                </Badge>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs Navigation */}
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col">
           <div className="border-b bg-gray-50/50 px-6">
             <TabsList className="w-full justify-start h-12 bg-transparent rounded-none p-0 gap-6">
@@ -165,107 +110,62 @@ export function ContactDetailModal({
                 className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-t-lg rounded-b-none gap-2 px-4 py-2"
               >
                 <FileText className="h-4 w-4" />
-                History
+                History ({conversations.length})
               </TabsTrigger>
               <TabsTrigger
                 value="action"
                 className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-t-lg rounded-b-none gap-2 px-4 py-2"
               >
                 <Zap className="h-4 w-4" />
-                Action
+                Details
               </TabsTrigger>
             </TabsList>
           </div>
 
-          {/* History Tab Content */}
-          <TabsContent value="history" className="p-6 m-0 flex-1 overflow-y-auto max-h-[calc(90vh-280px)]">
+          {/* History Tab */}
+          <TabsContent
+            value="history"
+            className="p-6 m-0 flex-1 overflow-y-auto max-h-[calc(90vh-280px)]"
+          >
             <div className="space-y-4">
-              {callHistory.length === 0 ? (
+              {conversations.length === 0 ? (
                 <div className="text-center py-16">
-                  <Headphones className="h-16 w-16 text-gray-200 mx-auto mb-4" />
-                  <p className="text-gray-500 font-medium mb-1">No History Yet</p>
+                  <MessageSquare className="h-16 w-16 text-gray-200 mx-auto mb-4" />
+                  <p className="text-gray-500 font-medium mb-1">No Conversations Yet</p>
                   <p className="text-sm text-gray-400">
-                    Call history will appear here. If you just made a call, it might take a few seconds to sync.
+                    Past conversation notes will appear here when added.
                   </p>
                 </div>
               ) : (
-                callHistory.map((call) => (
+                [...conversations].reverse().map((conv, idx) => (
                   <div
-                    key={call.id}
-                    onClick={() => onCallClick(call)}
-                    className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all hover:border-orange-200 cursor-pointer group"
+                    key={idx}
+                    className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all"
                   >
                     <div className="flex items-start gap-4">
-                      {/* Call Icon */}
-                      <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
-                        call.type === "inbound" ? "bg-purple-50 group-hover:bg-purple-100" : "bg-blue-50 group-hover:bg-blue-100"
-                      )}>
-                        <Phone className={cn(
-                          "h-5 w-5",
-                          call.type === "inbound" ? "text-purple-600" : "text-blue-600"
-                        )} />
+                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+                        <MessageSquare className="h-5 w-5 text-orange-600" />
                       </div>
-
-                      {/* Call Details */}
                       <div className="flex-1 min-w-0">
-                        {/* Header Row */}
-                        <div className="flex items-center gap-3 mb-2 flex-wrap">
-                          <Badge
-                            variant="outline"
-                            className={cn("text-[10px] h-5 uppercase px-2", getCallTypeStyle(call.type))}
-                          >
-                            {call.type || "Call"}
-                          </Badge>
-
-                          <Badge
-                            variant="outline"
-                            className={cn("text-[10px] h-5 px-2", getIntentStyle(call.intent))}
-                          >
-                            {call.intent || "No intent"}
-                          </Badge>
-
-                          {call.agent_name && (
-                            <Badge variant="secondary" className="text-[10px] h-5 px-2 bg-gray-100 text-gray-600">
-                              {call.agent_name}
-                            </Badge>
-                          )}
-
-                          <span className="text-xs text-gray-400 ml-auto flex items-center gap-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {formatRelativeTime(call.date)}
+                            {formatRelativeTime(conv.date)}
                           </span>
+                          <span className="text-xs text-gray-500">{formatDate(conv.date)}</span>
                         </div>
-
-                        {/* Summary */}
-                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
-                          {call.summary || call.transcript || "Conversation in progress or transcript pending..."}
-                        </p>
-
-                        {/* Footer - Explicit View Button */}
-                        <div className="flex items-center justify-between mt-3 text-xs">
-                          <div className="flex items-center gap-3">
-                            {call.duration > 0 && (
-                              <span className="text-gray-400 flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {Math.floor(call.duration / 60)}:{(call.duration % 60).toString().padStart(2, '0')}
-                              </span>
-                            )}
-                            {call.cost !== undefined && call.cost > 0 && (
-                              <span className="text-gray-400 flex items-center gap-1 font-medium">
-                                ₹{call.cost.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-[11px] text-orange-600 hover:text-orange-700 hover:bg-orange-50 font-semibold gap-1"
-                          >
-                            <FileText className="h-3 w-3" />
-                            View Transcript
-                          </Button>
-                        </div>
+                        {conv.summary && (
+                          <p className="text-sm text-gray-700 leading-relaxed mb-2">
+                            <span className="font-medium text-gray-900">Summary: </span>
+                            {conv.summary}
+                          </p>
+                        )}
+                        {conv.notes && (
+                          <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+                            <span className="font-medium text-gray-700">Notes: </span>
+                            {conv.notes}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -274,44 +174,66 @@ export function ContactDetailModal({
             </div>
           </TabsContent>
 
-          {/* Action Tab Content - Showing structured info */}
-          <TabsContent value="action" className="p-6 m-0 flex-1 overflow-y-auto max-h-[calc(90vh-280px)]">
+          {/* Details Tab */}
+          <TabsContent
+            value="action"
+            className="p-6 m-0 flex-1 overflow-y-auto max-h-[calc(90vh-280px)]"
+          >
             <div className="space-y-6">
-              {/* Contact Intelligence Overview */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Source</p>
-                  <p className="text-sm font-semibold text-gray-900 capitalize">{contact.source}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                    Lead Status
+                  </p>
+                  <Badge className={cn("mt-1", statusConfig.className)}>
+                    {statusConfig.label}
+                  </Badge>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Lead Status</p>
-                  <Badge className={cn("mt-1", getStatusBadgeStyle(contact.tag))}>
-                    {getStatusLabel(contact.tag)}
-                  </Badge>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                    Conversations
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{conversations.length}</p>
                 </div>
               </div>
 
-              {/* Last Call Data if exists */}
-              {contact.last_call_summary && (
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                  Contact Info
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Phone className="h-4 w-4 text-gray-400" />
+                    <span>{contact.phoneNumber}</span>
+                  </div>
+                  {contact.email && (
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      <span>{contact.email}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {conversations.length > 0 && (
                 <div className="bg-orange-50 rounded-xl p-5 border border-orange-100">
                   <h3 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-2">
                     <Zap className="h-4 w-4" />
-                    Latest Intelligence
+                    Latest Conversation
                   </h3>
                   <div className="bg-white/80 rounded-lg p-4 border border-orange-100">
-                    <p className="text-sm text-gray-700 leading-relaxed italic">
-                      "{contact.last_call_summary}"
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {conversations[conversations.length - 1].summary ||
+                        conversations[conversations.length - 1].notes ||
+                        "No details available."}
                     </p>
-                    {contact.last_call_agent && (
-                      <p className="text-[10px] text-orange-600 mt-2 font-medium">
-                        Captured by {contact.last_call_agent} on {contact.last_call_date ? formatDate(contact.last_call_date) : 'recent call'}
-                      </p>
-                    )}
+                    <p className="text-[10px] text-orange-600 mt-2 font-medium">
+                      {formatDate(conversations[conversations.length - 1].date)}
+                    </p>
                   </div>
                 </div>
               )}
 
-              {/* Coming Soon Placeholder for more complex actions */}
               <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 text-center">
                 <ShoppingCart className="h-8 w-8 text-blue-400 mx-auto mb-2" />
                 <p className="text-sm font-semibold text-blue-900">Booking Integration</p>
@@ -326,7 +248,8 @@ export function ContactDetailModal({
         {/* Footer */}
         <div className="border-t bg-gray-50 px-6 py-4">
           <p className="text-xs text-gray-500">
-            Last updated: {contact.updated_at ? new Date(contact.updated_at).toLocaleString() : "N/A"}
+            Added: {formatDate(contact.createdAt)} · Last updated:{" "}
+            {formatDate(contact.updatedAt)}
           </p>
         </div>
       </DialogContent>

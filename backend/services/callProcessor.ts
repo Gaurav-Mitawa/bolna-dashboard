@@ -7,9 +7,11 @@ import { pollNewCalls } from "./callPoller.js";
 import { analyzeTranscript } from "./llmService.js";
 import { Call } from "../models/Call.js";
 import { Contact } from "../models/Contact.js";
+import { normalizePhone } from "../utils/phoneUtils.js";
 
 const DELAY_BETWEEN_CALLS_MS = 10_000; // 10s pause between each LLM call
 const MAX_RETRIES = 3;
+const MAX_CALLS_PER_BATCH = 10; // Limit LLM hits per run
 
 function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,8 +38,8 @@ async function analyzeWithRetry(transcript: string, callId: string) {
     throw new Error("Max retries exceeded");
 }
 
-export async function processNewCalls() {
-    const newCalls = await pollNewCalls();
+export async function processNewCalls(userId: string, apiKey: string) {
+    const newCalls = await pollNewCalls(userId, apiKey);
 
     // --- Phase 1: Fast Sync (Database) ---
     // Ensure all calls and contacts are saved immediately so they appear in the UI.
@@ -49,6 +51,7 @@ export async function processNewCalls() {
                 { call_id: call.call_id },
                 {
                     $set: {
+                        userId,
                         agent_id: call.agent_id,
                         caller_number: call.caller_number,
                         call_duration: call.call_duration,
@@ -71,13 +74,21 @@ export async function processNewCalls() {
                 { upsert: true }
             );
 
-            // 2. Upsert Contact (Link phone number immediately)
             if (call.caller_number) {
+                const normalizedContactPhone = normalizePhone(call.caller_number);
                 await Contact.findOneAndUpdate(
-                    { phone: call.caller_number },
+                    {
+                        userId,
+                        $or: [
+                            { phone: call.caller_number },
+                            { phone: normalizedContactPhone }
+                        ]
+                    },
                     {
                         $setOnInsert: {
-                            name: `Contact ${call.caller_number.slice(-4)}`,
+                            name: `Contact ${normalizedContactPhone.slice(-4)}`,
+                            userId,
+                            phone: normalizedContactPhone,
                             email: "",
                             tag: "fresh",
                             source: call.call_direction === "outbound" ? "bolna_outbound" : "bolna_inbound",
@@ -87,14 +98,9 @@ export async function processNewCalls() {
                         },
                         $set: {
                             updated_at: new Date(),
-                            // We don't update last_call_summary here yet because we don't have analysis
                         },
-                        // We increment stats only if we are sure this call hasn't been counted before?
-                        // Actually, incrementing here is risky if we run this multiple times for the same call.
-                        // Ideally, we should check if this specific call_id was already linked.
-                        // For now, let's just ensure the contact exists.
                     },
-                    { upsert: true, new: true }
+                    { upsert: true, returnDocument: "after" }
                 );
             }
             synced++;
@@ -108,8 +114,14 @@ export async function processNewCalls() {
     // Process calls that haven't been analyzed yet.
     let processed = 0;
     let failed = 0;
+    let batchCount = 0;
 
     for (let i = 0; i < newCalls.length; i++) {
+        if (batchCount >= MAX_CALLS_PER_BATCH) {
+            console.log(`[Processor] Batch limit (${MAX_CALLS_PER_BATCH}) reached. Stopping LLM analysis for this run.`);
+            break;
+        }
+
         const call = newCalls[i];
 
         // Check if already processed to avoid re-running LLM
@@ -117,6 +129,15 @@ export async function processNewCalls() {
         if (existingCall && existingCall.processed) {
             continue;
         }
+
+        // Skip if transcript is too short to be meaningful
+        if (!call.transcript || call.transcript.trim().length < 15) {
+            console.log(`[Processor] Skipping short/empty transcript for ${call.call_id}`);
+            await Call.updateOne({ call_id: call.call_id }, { $set: { processed: true } });
+            continue;
+        }
+
+        batchCount++;
 
         // Delay between calls (skip for first one in this batch)
         if (processed > 0) {
@@ -134,7 +155,6 @@ export async function processNewCalls() {
             raw = result.raw;
         } catch (err) {
             console.error(`[Processor] LLM analysis failed for ${call.call_id}, saving raw transcript only. Error:`, err);
-            // We continue to save the call with analysis=null
         }
 
         try {
@@ -144,20 +164,21 @@ export async function processNewCalls() {
                 {
                     $set: {
                         llm_analysis: analysis,
-                        processed: !!analysis,
-                        raw_llm_output: analysis ? null : raw, // Save raw if analysis failed
+                        processed: true, // Always mark as processed to stop retries
+                        raw_llm_output: analysis ? null : raw,
                     },
                 }
             );
 
             // Update Contact with Summary/Intent
             if (call.caller_number && analysis) {
-                // Determine status based on intent
                 let status = "fresh";
                 if (analysis.booking?.is_booked) status = "purchased";
-                else if (analysis.intent === "booked") status = "purchased"; // Double check
+                else if (analysis.intent === "booked") status = "purchased";
+                else if (analysis.intent === "interested") status = "interested";
+                else if (analysis.intent === "follow_up") status = "follow_up";
                 else if (analysis.intent === "not_interested") status = "not_interested";
-                else status = "fresh"; // Default to fresh if queries
+                else status = "fresh";
 
                 const updateOps: any = {
                     $set: {
@@ -172,13 +193,19 @@ export async function processNewCalls() {
                     }
                 };
 
-                // If status is significant (not simple "fresh"), update the tag for existing contacts too
                 if (status !== "fresh") {
                     updateOps.$set.tag = status;
                 }
 
+                const normalizedContactPhone = normalizePhone(call.caller_number);
                 await Contact.findOneAndUpdate(
-                    { phone: call.caller_number },
+                    {
+                        userId,
+                        $or: [
+                            { phone: call.caller_number },
+                            { phone: normalizedContactPhone }
+                        ]
+                    },
                     updateOps
                 );
             }

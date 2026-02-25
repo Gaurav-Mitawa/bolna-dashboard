@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IContact extends Document {
     name: string;
+    userId: string;
     email: string;
     phone: string;
     tag: string; // status: purchased, converted, fresh, not_interested, etc.
@@ -17,8 +18,9 @@ export interface IContact extends Document {
 
 const ContactSchema = new Schema<IContact>({
     name: { type: String, required: true },
+    userId: { type: String, required: true, index: true },
     email: { type: String, default: "" },
-    phone: { type: String, required: true, unique: true, index: true },
+    phone: { type: String, required: true, index: true },
     tag: { type: String, default: "fresh" },
     source: { type: String, default: "unknown" },
     call_count: { type: Number, default: 0 },

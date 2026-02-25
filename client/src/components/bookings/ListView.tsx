@@ -28,6 +28,14 @@ const intentBadge: Record<string, { label: string; className: string }> = {
     label: "Booked",
     className: "bg-green-100 text-green-700 border-green-300",
   },
+  interested: {
+    label: "Interested",
+    className: "bg-blue-100 text-blue-700 border-blue-300",
+  },
+  follow_up: {
+    label: "Follow Up",
+    className: "bg-purple-100 text-purple-700 border-purple-300",
+  },
   queries: {
     label: "Queries",
     className: "bg-amber-100 text-amber-700 border-amber-300",

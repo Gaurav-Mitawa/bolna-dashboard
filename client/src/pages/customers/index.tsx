@@ -2,12 +2,25 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Filter, Loader2, ChevronLeft, ChevronRight, RefreshCw, Phone, Search } from "lucide-react";
+import {
+  Users,
+  Filter,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  Search,
+  Plus,
+  Upload,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { CustomersTable } from "@/components/customers/CustomersTable";
-import type { Contact, CallHistoryItem } from "@/types";
+import type { CrmCustomer } from "@/api/crm";
+import { crmApi } from "@/api/crm";
 import { ContactDetailModal } from "@/components/customers/ContactDetailModal";
-import { CallSummaryModal } from "@/components/customers/CallSummaryModal";
-import { contactsApi } from "@/api/contacts";
+import { AddLeadModal } from "@/components/customers/AddLeadModal";
+import { BulkUploadModal } from "@/components/customers/BulkUploadModal";
+import { EditLeadModal } from "@/components/customers/EditLeadModal";
 import { toast } from "sonner";
 import {
   Select,
@@ -20,57 +33,56 @@ import {
 const PAGE_SIZE = 10;
 
 export default function CustomersIndexPage() {
-  // State
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
-  // Modal states
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<CrmCustomer | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedCall, setSelectedCall] = useState<CallHistoryItem | null>(null);
-  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
 
-  // Fetch contacts directly from Bolna API
-  const { data: contactsData, isLoading, error: queryError, refetch, isRefetching } = useQuery({
-    queryKey: ["bolna-contacts", page, search, statusFilter, sourceFilter],
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
+  const [contactToEdit, setContactToEdit] = useState<CrmCustomer | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const {
+    data: contactsData,
+    isLoading,
+    error: queryError,
+    refetch,
+    isRefetching,
+  } = useQuery({
+    queryKey: ["crm-customers", page, search, statusFilter],
     queryFn: () =>
-      contactsApi.getAll({
+      crmApi.getAll({
         page,
         limit: PAGE_SIZE,
         search: search || undefined,
-        tag: statusFilter !== "all" ? statusFilter : undefined,
-        source: sourceFilter !== "all" ? sourceFilter : undefined,
+        status: statusFilter !== "all" ? (statusFilter as any) : undefined,
       }),
-    refetchInterval: 5000, // Poll every 5 seconds for live updates
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 0,
   });
 
-  // Update last refreshed time on successful fetch
   useEffect(() => {
     if (contactsData && !isLoading) {
       setLastRefreshed(new Date());
     }
   }, [contactsData, isLoading]);
 
-  const contacts = contactsData?.contacts || [];
-  const totalPages = contactsData?.pagination?.pages || 1;
-  const totalCount = contactsData?.pagination?.total || 0;
+  const customers = contactsData?.customers || [];
+  const totalCount = contactsData?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  // Refresh data from Bolna
   const refreshData = async () => {
     try {
       await refetch();
       toast.success("Data refreshed");
-    } catch (error) {
-      console.error("Refresh error:", error);
+    } catch {
       toast.error("Failed to refresh data");
     }
   };
 
-  // Format last refreshed time
   const getLastRefreshedText = () => {
     if (!lastRefreshed) return "Never";
     const diff = Date.now() - lastRefreshed.getTime();
@@ -83,41 +95,45 @@ export default function CustomersIndexPage() {
     return `${hours} hours ago`;
   };
 
-  // Handle view contact - opens detail modal and fetches full history if needed
-  const handleViewContact = useCallback(async (contact: Contact) => {
+  const handleViewContact = useCallback((contact: CrmCustomer) => {
     setSelectedContact(contact);
     setIsDetailModalOpen(true);
+  }, []);
 
-    // Fetch full details including history from backend
-    try {
-      const fullDetails = await contactsApi.getContactDetails(contact.id);
-      // fullDetails from backend is { ...contact, call_history: [...] }
-      setSelectedContact(fullDetails);
-    } catch (error) {
-      console.error("Failed to fetch contact details:", error);
-      // We still have the basic contact data from the list
+  const handleEditContact = (contact: CrmCustomer) => {
+    setContactToEdit(contact);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteContact = async (contact: CrmCustomer) => {
+    if (window.confirm(`Are you sure you want to delete ${contact.name}?`)) {
+      try {
+        await crmApi.delete(contact._id);
+        toast.success("Lead deleted successfully");
+        refetch();
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || "Failed to delete lead");
+      }
     }
-  }, []);
-
-  // Handle call click from detail modal - opens call summary modal
-  const handleCallClick = useCallback((call: CallHistoryItem) => {
-    setSelectedCall(call);
-    setIsCallModalOpen(true);
-  }, []);
-
-  // Handle edit contact - disabled since API-only mode
-  const handleEditContact = useCallback((_contact: Contact) => {
-    toast.info("Editing contacts is disabled in API-only mode. Data comes directly from Bolna executions.");
-  }, []);
-
-  // Handle delete contact - disabled since API-only mode
-  const handleDeleteContact = useCallback((_contact: Contact) => {
-    toast.info("Deleting contacts is disabled in API-only mode. Data comes directly from Bolna executions.");
-  }, []);
+  };
+  const handleSyncBolna = async () => {
+    const toastId = toast.loading("Syncing with Bolna...");
+    try {
+      const result = await crmApi.syncBolna();
+      if (result.success) {
+        toast.success(`Sync complete! Created: ${result.data.created}, Updated: ${result.data.updated}`, { id: toastId });
+        refetch();
+      } else {
+        toast.error("Sync failed", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to sync with Bolna", { id: toastId });
+    }
+  };
 
   return (
     <div className="space-y-4">
-      {/* Header - Responsive */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4 sm:p-6 rounded-xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -125,10 +141,10 @@ export default function CustomersIndexPage() {
               <Users className="h-5 w-5 sm:h-6 sm:w-6" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-lg sm:text-xl font-semibold text-gray-900">Customers Lead</p>
+              <p className="text-lg sm:text-xl font-semibold text-gray-900">CRM Customers</p>
               <p className="text-xs sm:text-sm text-gray-500">
-                <span className="hidden sm:inline">Real-time customer interactions</span>
-                <span className="sm:hidden">Customer data</span>
+                <span className="hidden sm:inline">Manage your lead pipeline</span>
+                <span className="sm:hidden">Lead pipeline</span>
                 {lastRefreshed && (
                   <span className="text-gray-400 ml-2 hidden sm:inline">
                     (Last refreshed: {getLastRefreshedText()})
@@ -138,81 +154,94 @@ export default function CustomersIndexPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="relative flex-1 sm:flex-none">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 sm:hidden" />
-              <Input
-                placeholder="Search by name or phone..."
-                className="w-full sm:w-64 bg-gray-50 pl-9 sm:pl-3 text-sm"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <Button
+              className="h-9 sm:h-10 bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+              onClick={() => setIsAddModalOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Lead</span>
+            </Button>
             <Button
               variant="outline"
-              className="h-9 sm:h-10 text-gray-700 gap-1.5 flex-shrink-0 text-sm"
+              className="h-9 sm:h-10 text-gray-700 gap-1.5 border-gray-300"
+              onClick={() => setIsBulkUploadModalOpen(true)}
+            >
+              <Upload className="h-4 w-4" />
+              <span>Bulk Upload</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-9 sm:h-10 text-blue-600 border-blue-200 hover:bg-blue-50 gap-1.5"
+              onClick={handleSyncBolna}
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Sync from Bolna</span>
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-9 sm:h-10 text-gray-500 gap-1.5 p-2"
               onClick={refreshData}
               disabled={isRefetching}
-              title={`Last refreshed: ${getLastRefreshedText()}`}
             >
-              {isRefetching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Filters - Responsive */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <span className="flex items-center gap-1 text-sm text-gray-700">
-            <Filter className="h-4 w-4 text-gray-500" />
-            <span className="hidden sm:inline">Filters:</span>
-          </span>
-          <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="h-8 w-[130px] sm:w-32 text-sm">
-              <SelectValue placeholder="Source: All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Source: All</SelectItem>
-              <SelectItem value="bolna_inbound">Bolna Inbound</SelectItem>
-              <SelectItem value="bolna_outbound">Bolna Outbound</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-[130px] sm:w-32 text-sm">
-              <SelectValue placeholder="Status: All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Status: All</SelectItem>
-              <SelectItem value="purchased">Purchased</SelectItem>
-              <SelectItem value="converted">Converted</SelectItem>
-              <SelectItem value="fresh">Fresh</SelectItem>
-              <SelectItem value="fresh_na">Fresh - NA</SelectItem>
-              <SelectItem value="not_interested">Not Interested</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by name or phone..."
+              className="pl-9 bg-gray-50 text-sm h-9 border-gray-200"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                setStatusFilter(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-[160px] text-sm border-gray-200 focus:ring-blue-500">
+                <SelectValue placeholder="Status Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="fresh">Fresh</SelectItem>
+                <SelectItem value="interested">Interested</SelectItem>
+                <SelectItem value="not_interested">Not Interested</SelectItem>
+                <SelectItem value="booked">Booked</SelectItem>
+                <SelectItem value="queries">Queries</SelectItem>
+                <SelectItem value="NA">N/A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="text-xs sm:text-sm text-gray-500">
-          Showing {contacts.length} of {totalCount} contacts
+
+        <div className="text-xs sm:text-sm text-gray-500 font-medium">
+          {totalCount} total customers
         </div>
       </div>
 
       {/* Error Display */}
       {queryError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-          <p className="text-red-700 font-medium text-sm sm:text-base">Error loading contacts</p>
-          <p className="text-red-600 text-xs sm:text-sm">{(queryError as Error).message}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2"
-            onClick={refreshData}
-          >
+          <p className="text-red-700 font-medium text-sm">Error loading customers</p>
+          <p className="text-red-600 text-xs">{(queryError as Error).message}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={refreshData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -221,26 +250,34 @@ export default function CustomersIndexPage() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        <div className="flex items-center justify-center py-20 bg-white border border-gray-100 rounded-xl">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
         </div>
-      ) : contacts.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-12 text-center">
-          <Phone className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
-          <p className="text-gray-500 mb-4 text-sm sm:text-base">
-            {search || statusFilter !== "all" || sourceFilter !== "all"
-              ? "Try adjusting your filters"
-              : "No execution data available from Bolna API. Make sure your API key is configured."}
+      ) : customers.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-16 text-center shadow-sm">
+          <div className="h-16 w-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Users className="h-8 w-8 text-gray-300" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            No leads found
+          </h3>
+          <p className="text-gray-500 mb-6 max-w-sm mx-auto text-sm">
+            {search || statusFilter !== "all"
+              ? "We couldn't find any leads matching your current filters. Try resetting them."
+              : "Your lead pipeline is empty. Start by adding a single lead or uploading a CSV file."}
           </p>
-          <Button variant="outline" onClick={refreshData} disabled={isRefetching}>
-            {isRefetching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Refresh Data
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsAddModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Add Lead
+            </Button>
+            <Button variant="outline" onClick={() => setIsBulkUploadModalOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" /> Bulk Upload
+            </Button>
+          </div>
         </div>
       ) : (
         <CustomersTable
-          data={contacts}
+          data={customers}
           onView={handleViewContact}
           onEdit={handleEditContact}
           onDelete={handleDeleteContact}
@@ -249,46 +286,62 @@ export default function CustomersIndexPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-3">
+        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="text-sm"
+            className="text-gray-600 hover:bg-gray-50"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">Previous</span>
+            Previous
           </Button>
-          <span className="text-xs sm:text-sm text-gray-600">
-            Page {page} of {totalPages}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs sm:text-sm font-medium text-gray-900 px-3 py-1 bg-gray-100 rounded-md">
+              {page}
+            </span>
+            <span className="text-xs sm:text-sm text-gray-400">
+              of {totalPages}
+            </span>
+          </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="text-sm"
+            className="text-gray-600 hover:bg-gray-50"
           >
-            <span className="hidden sm:inline">Next</span>
+            Next
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       )}
 
-      {/* Contact Detail Modal */}
+      {/* Modals */}
       <ContactDetailModal
         contact={selectedContact}
         open={isDetailModalOpen}
         onOpenChange={setIsDetailModalOpen}
-        onCallClick={handleCallClick}
       />
 
-      {/* Call Summary Modal */}
-      <CallSummaryModal
-        isOpen={isCallModalOpen}
-        onClose={() => setIsCallModalOpen(false)}
-        call={selectedCall}
+      <AddLeadModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        onSuccess={() => refetch()}
+      />
+
+      <BulkUploadModal
+        open={isBulkUploadModalOpen}
+        onOpenChange={setIsBulkUploadModalOpen}
+        onSuccess={() => refetch()}
+      />
+
+      <EditLeadModal
+        customer={contactToEdit}
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        onSuccess={() => refetch()}
       />
     </div>
   );

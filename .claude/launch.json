@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Full Stack (Backend + Frontend)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx/esm", "server/index.ts"],
+      "port": 5000
+    }
+  ]
+}

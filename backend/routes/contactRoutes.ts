@@ -3,14 +3,20 @@ import { Contact } from "../models/Contact.js";
 import { Call } from "../models/Call.js";
 import { syncCallsForPhone } from "../services/callPoller.js";
 import { analyzeTranscript } from "../services/llmService.js";
+import { isAuthenticated, hasBolnaKey } from "../middleware/auth.js";
+import { getApiKey } from "../services/bolnaService.js";
 
 const router = Router();
+
+// Apply authentication to all routes
+router.use(isAuthenticated);
 
 // GET /api/contacts - List all contacts with filters
 router.get("/", async (req: Request, res: Response) => {
     try {
+        const userId = (req.user as any)._id;
         const { tag, source, search, limit, skip } = req.query;
-        const query: any = {};
+        const query: any = { userId }; // Always scope by userId
 
         if (tag) query.tag = tag;
         if (source) query.source = source;
@@ -27,13 +33,9 @@ router.get("/", async (req: Request, res: Response) => {
             .skip(Number(skip) || 0)
             .lean();
 
-        // Check if we need to return call history summary?? NO, list view just needs summaries.
-        // The Contact model stores summaries already (via callProcessor updates).
-
-        // Transform _id to id for frontend compatibility?
         const result = contacts.map(c => ({
             ...c,
-            id: c._id.toString(), // Frontend expects string ID
+            id: c._id.toString(),
         }));
 
         res.json({
@@ -53,9 +55,9 @@ router.get("/", async (req: Request, res: Response) => {
 // GET /api/contacts/:id/latest-structured-call
 router.get("/:id/latest-structured-call", async (req: Request, res: Response) => {
     try {
-        const contact = await Contact.findById(req.params.id).lean();
-        // If not found by ID, try phone
-        const query = contact ? { caller_number: contact.phone } : { caller_number: req.params.id };
+        const userId = (req.user as any)._id;
+        const contact = await Contact.findOne({ _id: req.params.id, userId }).lean();
+        const query = contact ? { caller_number: contact.phone, userId } : { caller_number: req.params.id, userId };
 
         const latestCall = await Call.findOne(query)
             .sort({ call_timestamp: -1 })
@@ -73,8 +75,8 @@ router.get("/:id/latest-structured-call", async (req: Request, res: Response) =>
             date: latestCall.call_timestamp,
             intent: analysis.intent,
             summary: analysis.summary,
-            structured_data: analysis.booking || {}, // Map booking data as structured data
-            sentiment_score: 0, // Placeholder
+            structured_data: analysis.booking || {},
+            sentiment_score: 0,
             success_evaluation: "unknown"
         });
     } catch (err: any) {
@@ -85,39 +87,44 @@ router.get("/:id/latest-structured-call", async (req: Request, res: Response) =>
 // GET /api/contacts/:id - Get single contact + call history
 router.get("/:id", async (req: Request, res: Response) => {
     try {
-        const contact = await Contact.findById(req.params.id).lean();
+        const userId = (req.user as any)._id;
+        let contact = await Contact.findOne({ _id: req.params.id, userId }).lean();
         if (!contact) {
-            // Try finding by phone if ID is not ObjectId
-            const byPhone = await Contact.findOne({ phone: req.params.id }).lean();
+            const byPhone = await Contact.findOne({ phone: req.params.id, userId }).lean();
             if (byPhone) {
-                return res.json({ ...byPhone, id: byPhone._id.toString() });
+                contact = byPhone;
+            } else {
+                return res.status(404).json({ error: "Contact not found" });
             }
-            return res.status(404).json({ error: "Contact not found" });
         }
 
-        // Fetch call history for this contact's phone
-        let calls = await Call.find({ caller_number: contact.phone })
+        let calls = await Call.find({ caller_number: contact.phone, userId })
             .sort({ call_timestamp: -1 })
             .lean();
 
-        // If history is empty, try to sync from Bolna on the fly
         if (calls.length === 0) {
             console.log(`[Routes] No history found for ${contact.phone}, syncing from Bolna...`);
             try {
-                const syncedCalls = await syncCallsForPhone(contact.phone);
+                const apiKey = getApiKey(req.user);
+                const syncedCalls = await syncCallsForPhone(contact.phone, apiKey);
                 console.log(`[Routes] Sync found ${syncedCalls.length} calls for ${contact.phone}`);
 
                 if (syncedCalls.length > 0) {
-                    // Save synced calls to DB (without processing them with LLM immediately for speed)
                     for (const call of syncedCalls) {
                         await Call.updateOne(
-                            { call_id: call.call_id },
-                            { $set: { ...call, created_at: new Date(call.call_timestamp) }, $setOnInsert: { processed: false } },
+                            { call_id: call.call_id, userId },
+                            {
+                                $set: {
+                                    ...call,
+                                    userId,
+                                    created_at: new Date(call.call_timestamp)
+                                },
+                                $setOnInsert: { processed: false }
+                            },
                             { upsert: true }
                         );
                     }
-                    // Fetch again
-                    calls = await Call.find({ caller_number: contact.phone })
+                    calls = await Call.find({ caller_number: contact.phone, userId })
                         .sort({ call_timestamp: -1 })
                         .lean();
                 }
@@ -126,15 +133,14 @@ router.get("/:id", async (req: Request, res: Response) => {
             }
         }
 
-        // Transform calls to frontend format (CallHistoryItem)
         const callHistory = calls.map(call => ({
             id: call.call_id,
             date: call.call_timestamp,
             duration: call.call_duration,
-            status: call.processed ? "completed" : "failed", // simple logic
+            status: call.processed ? "completed" : "failed",
             type: call.call_direction,
             intent: call.llm_analysis?.intent,
-            summary: call.llm_analysis?.summary || call.transcript, // Fallback to transcript if no summary
+            summary: call.llm_analysis?.summary || call.transcript,
             transcript: call.transcript,
             recording_url: call.recording_url || "",
             agent_name: call.agent_name || call.agent_id,
@@ -145,7 +151,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
         res.json({
             ...contact,
-            id: contact._id.toString(),
+            id: (contact as any)._id.toString(),
             call_history: callHistory
         });
     } catch (err: any) {
@@ -156,7 +162,8 @@ router.get("/:id", async (req: Request, res: Response) => {
 // POST /api/contacts - Create contact
 router.post("/", async (req: Request, res: Response) => {
     try {
-        const newContact = new Contact(req.body);
+        const userId = (req.user as any)._id;
+        const newContact = new Contact({ ...req.body, userId });
         const saved = await newContact.save();
         res.json({ ...saved.toObject(), id: saved._id.toString() });
     } catch (err: any) {
@@ -167,13 +174,14 @@ router.post("/", async (req: Request, res: Response) => {
 // PUT /api/contacts/:id - Update contact
 router.put("/:id", async (req: Request, res: Response) => {
     try {
-        const updated = await Contact.findByIdAndUpdate(
-            req.params.id,
+        const userId = (req.user as any)._id;
+        const updated = await Contact.findOneAndUpdate(
+            { _id: req.params.id, userId },
             { ...req.body, updated_at: new Date() },
-            { new: true }
+            { returnDocument: 'after' }
         ).lean();
         if (!updated) return res.status(404).json({ error: "Contact not found" });
-        res.json({ ...updated, id: updated._id.toString() });
+        res.json({ ...updated, id: (updated as any)._id.toString() });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -182,7 +190,8 @@ router.put("/:id", async (req: Request, res: Response) => {
 // DELETE /api/contacts/:id - Delete contact
 router.delete("/:id", async (req: Request, res: Response) => {
     try {
-        await Contact.findByIdAndDelete(req.params.id);
+        const userId = (req.user as any)._id;
+        await Contact.findOneAndDelete({ _id: req.params.id, userId });
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });

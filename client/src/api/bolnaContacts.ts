@@ -161,7 +161,7 @@ function transformExecutionsToContacts(executions: BolnaExecution[]): Contact[] 
 
   for (const [normalizedPhone, phoneExecutions] of executionsByPhone) {
     // Sort by date (newest first)
-    phoneExecutions.sort((a, b) =>
+    phoneExecutions.sort((a: BolnaExecution, b: BolnaExecution) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
@@ -170,7 +170,7 @@ function transformExecutionsToContacts(executions: BolnaExecution[]): Contact[] 
 
     // Calculate metrics
     const callCount = phoneExecutions.length;
-    const totalDuration = phoneExecutions.reduce((sum, ex) => sum + (ex.conversation_time || 0), 0);
+    const totalDuration = phoneExecutions.reduce((sum: number, ex: BolnaExecution) => sum + (ex.conversation_time || 0), 0);
     const lastCallDate = mostRecent.created_at;
 
     // Build call history (last 10 calls)
@@ -190,7 +190,7 @@ function transformExecutionsToContacts(executions: BolnaExecution[]): Contact[] 
       normalized_phone: normalizedPhone,
       tag: status,
       source: source,
-      no_answer_count: phoneExecutions.filter(ex => ex.status === "no-answer").length,
+      no_answer_count: phoneExecutions.filter((ex: BolnaExecution) => ex.status === "no-answer").length,
       last_call_summary: extractSummary(mostRecent),
       last_call_date: lastCallDate,
       call_count: callCount,

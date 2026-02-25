@@ -1,13 +1,28 @@
 /**
- * Auth Context - Bolna API Key Authentication
- * Simple authentication using Bolna API key from environment
+ * Auth Context — Backend Session-Based Authentication
+ * Uses /api/auth/me to check session state (Google OAuth via Passport.js)
  */
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { userApi, isBolnaConfigured, BolnaUser } from '@/lib/bolnaApi';
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  profileImage: string;
+  bolnaKeySet: boolean;
+  subscriptionStatus: 'inactive' | 'trial' | 'active' | 'expired';
+  subscriptionExpiresAt: string | null;
+  isSubscriptionActive: boolean;
+  trialExpiresAt: string | null;
+  trialStartedAt: string | null;
+  // Legacy fields — kept for backwards compat with existing components
+  wallet_balance?: number;
+  wallet?: number;
+}
 
 interface AuthContextType {
-  user: BolnaUser | null;
+  user: SessionUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -29,26 +44,34 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<BolnaUser | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchUser = async () => {
-    // Check if API key is configured
-    if (!isBolnaConfigured()) {
-      setError('Bolna API key not configured. Please add VITE_BOLNA_API_KEY to your .env file.');
-      setIsLoading(false);
-      return;
-    }
-
     try {
       setIsLoading(true);
       setError(null);
-      const userData = await userApi.getMe();
-      setUser(userData);
+
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch user session');
+      }
+
+      const data = await res.json();
+      setUser(data);
     } catch (err) {
-      console.error('Failed to fetch user:', err);
-      setError(err instanceof Error ? err.message : 'Failed to authenticate with Bolna API');
+      console.error('Auth check failed:', err);
+      setError(err instanceof Error ? err.message : 'Authentication error');
       setUser(null);
     } finally {
       setIsLoading(false);
