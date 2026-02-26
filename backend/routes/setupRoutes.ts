@@ -49,14 +49,14 @@ router.post("/", isAuthenticated, sensitiveLimiter, async (req: Request, res: Re
 
     const update: any = { bolnaApiKey: encryptedKey };
 
-    // Start free trial if not already started (or 100-year trial if bypass)
-    if (!dbUser.trialStartedAt || isBypass) {
+    // Start free trial if not already started
+    if (!dbUser.trialStartedAt) {
       const now = new Date();
       update.trialStartedAt = now;
-      const durationDays = isBypass ? 365 * 100 : PLANS.trial.durationDays;
+      const durationDays = PLANS.trial.durationDays;
       update.trialExpiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
-      update.subscriptionStatus = isBypass ? "active" : "trial";
-      console.log(`[SetupAPI] Starting ${isBypass ? "100-year" : `${PLANS.trial.durationDays}-day`} trial for user: ${dbUser._id}`);
+      update.subscriptionStatus = "trial";
+      console.log(`[SetupAPI] Starting ${durationDays}-day trial for user: ${dbUser._id}`);
     }
 
     await User.findByIdAndUpdate(dbUser._id, update);
