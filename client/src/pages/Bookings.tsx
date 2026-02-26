@@ -105,9 +105,9 @@ export default function BookingsPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 w-full lg:w-auto">
           {/* View Toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 shrink-0">
             <Button
               variant={viewMode === "calendar" ? "default" : "ghost"}
               size="sm"
@@ -130,7 +130,7 @@ export default function BookingsPage() {
           </div>
 
           {/* Search */}
-          <div className="relative flex-1 sm:flex-none min-w-[140px] sm:min-w-0">
+          <div className="relative w-full sm:flex-1 sm:w-auto min-w-[140px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search bookings..."
