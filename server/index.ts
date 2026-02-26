@@ -62,6 +62,7 @@ app.use((req, res, next) => {
   const MONGO_URI = process.env.MONGODB_URI || "";
 
   // ─── Session middleware (MUST be before passport) ─────────────────────────
+  app.set("trust proxy", 1); // Trust first proxy (required for Render/DigitalOcean HTTPS)
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
