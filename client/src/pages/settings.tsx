@@ -32,6 +32,8 @@ interface SettingsData {
   trialExpiresAt: string | null;
   trialStartedAt: string | null;
   isSubscriptionActive: boolean;
+  daysRemaining: number;
+  isTrial: boolean;
 }
 
 async function fetchSettings(): Promise<SettingsData> {
@@ -166,12 +168,16 @@ export default function SettingsPage() {
             </div>
             <div>
               <CardTitle className="text-base sm:text-lg">Subscription</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Your current subscription status</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">
+                {settings?.isTrial
+                  ? "7-Day Free Trial — ClusterX CRM"
+                  : "Your current subscription status"}
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 pt-2 sm:pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
             <div>
               <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1">Status</p>
               <div className="mt-1">{subscriptionStatusBadge()}</div>
@@ -188,6 +194,21 @@ export default function SettingsPage() {
                       : "—"}
                 </p>
               </div>
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1">Days Remaining</p>
+              <p className={cn(
+                "text-sm font-semibold",
+                settings?.daysRemaining && settings.daysRemaining <= 3
+                  ? "text-red-600"
+                  : settings?.daysRemaining && settings.daysRemaining <= 7
+                    ? "text-yellow-600"
+                    : "text-gray-900"
+              )}>
+                {(settings?.subscriptionStatus === "active" || settings?.subscriptionStatus === "trial")
+                  ? `${settings?.daysRemaining ?? 0} days`
+                  : "—"}
+              </p>
             </div>
             <div className="flex items-end">
               {!(settings?.isSubscriptionActive ?? user?.isSubscriptionActive) && (

@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { crmApi } from "@/api/crm";
-import { Upload, FileText, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, FileText, X, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +56,26 @@ export function BulkUploadModal({ open, onOpenChange, onSuccess }: BulkUploadMod
         } finally {
             setIsUploading(false);
         }
+    };
+
+    const handleDownloadTemplate = () => {
+        const headers = ["name", "phoneNumber", "email", "status"];
+        const exampleRow = ["John Doe", "1234567890", "john@example.com", "fresh"];
+
+        const csvContent = [
+            headers.join(","),
+            exampleRow.join(",")
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'customer_upload_template.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -121,17 +141,28 @@ export function BulkUploadModal({ open, onOpenChange, onSuccess }: BulkUploadMod
                                 )}
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-2">
-                                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                                    Cancel
-                                </Button>
+                            <div className="flex justify-between items-center pt-2">
                                 <Button
-                                    onClick={handleUpload}
-                                    className="bg-[#F15E04] hover:bg-[#d94f04]"
-                                    disabled={!file || isUploading}
+                                    type="button"
+                                    variant="outline"
+                                    className="gap-2 text-slate-600 border-slate-200 hover:bg-slate-50"
+                                    onClick={handleDownloadTemplate}
                                 >
-                                    {isUploading ? "Uploading..." : "Start Upload"}
+                                    <Download className="h-4 w-4" />
+                                    Download Template
                                 </Button>
+                                <div className="flex gap-2">
+                                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        onClick={handleUpload}
+                                        className="bg-[#F15E04] hover:bg-[#d94f04]"
+                                        disabled={!file || isUploading}
+                                    >
+                                        {isUploading ? "Uploading..." : "Start Upload"}
+                                    </Button>
+                                </div>
                             </div>
                         </>
                     ) : (

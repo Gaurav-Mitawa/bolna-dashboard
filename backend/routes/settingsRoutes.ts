@@ -7,12 +7,25 @@ import { sensitiveLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
-// GET /api/settings — Return masked key + subscription info
+// GET /api/settings — Return masked key + subscription info + days remaining
 router.get("/", isAuthenticated, (req: Request, res: Response) => {
   const user = req.user as any;
   const maskedKey = user.bolnaApiKey
     ? "••••••••" + decrypt(user.bolnaApiKey).slice(-4)
     : null;
+
+  // Calculate days remaining
+  const now = Date.now();
+  let daysRemaining = 0;
+  let isTrial = false;
+
+  if (user.trialExpiresAt && new Date(user.trialExpiresAt).getTime() > now) {
+    daysRemaining = Math.ceil((new Date(user.trialExpiresAt).getTime() - now) / (1000 * 60 * 60 * 24));
+    isTrial = true;
+  } else if (user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt).getTime() > now) {
+    daysRemaining = Math.ceil((new Date(user.subscriptionExpiresAt).getTime() - now) / (1000 * 60 * 60 * 24));
+  }
+
   res.json({
     name: user.name,
     email: user.email,
@@ -23,6 +36,8 @@ router.get("/", isAuthenticated, (req: Request, res: Response) => {
     trialExpiresAt: user.trialExpiresAt,
     trialStartedAt: user.trialStartedAt,
     isSubscriptionActive: user.isSubscriptionActive,
+    daysRemaining,
+    isTrial,
   });
 });
 

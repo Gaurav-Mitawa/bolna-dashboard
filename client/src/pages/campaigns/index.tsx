@@ -128,12 +128,16 @@ export default function CampaignsPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Failed to stop" }));
-        throw new Error(err.error || "Failed to stop campaign");
+        // Refetch to pick up any auto-synced status from the backend
+        refetch();
+        toast.error(err.error || "Campaign may have already completed. Status has been refreshed.");
+        return;
       }
       toast.success("Campaign stopped successfully");
       refetch();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || "Network error while stopping campaign");
+      refetch();
     } finally {
       setStoppingId(null);
     }

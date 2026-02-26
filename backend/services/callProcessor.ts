@@ -76,32 +76,44 @@ export async function processNewCalls(userId: string, apiKey: string) {
 
             if (call.caller_number) {
                 const normalizedContactPhone = normalizePhone(call.caller_number);
-                await Contact.findOneAndUpdate(
-                    {
-                        userId,
-                        $or: [
-                            { phone: call.caller_number },
-                            { phone: normalizedContactPhone }
-                        ]
-                    },
-                    {
-                        $setOnInsert: {
-                            name: `Contact ${normalizedContactPhone.slice(-4)}`,
+                try {
+                    await Contact.findOneAndUpdate(
+                        {
                             userId,
-                            phone: normalizedContactPhone,
-                            email: "",
-                            tag: "fresh",
-                            source: call.call_direction === "outbound" ? "bolna_outbound" : "bolna_inbound",
-                            created_at: new Date(),
-                            call_count: 0,
-                            total_call_duration: 0
+                            $or: [
+                                { phone: call.caller_number },
+                                { phone: normalizedContactPhone }
+                            ]
                         },
-                        $set: {
-                            updated_at: new Date(),
+                        {
+                            $setOnInsert: {
+                                name: `Contact ${normalizedContactPhone.slice(-4)}`,
+                                userId,
+                                phone: normalizedContactPhone,
+                                email: "",
+                                tag: "fresh",
+                                source: call.call_direction === "outbound" ? "bolna_outbound" : "bolna_inbound",
+                                created_at: new Date(),
+                                call_count: 0,
+                                total_call_duration: 0
+                            },
+                            $set: {
+                                updated_at: new Date(),
+                            },
                         },
-                    },
-                    { upsert: true, returnDocument: "after" }
-                );
+                        { upsert: true, returnDocument: "after" }
+                    );
+                } catch (dupErr: any) {
+                    if (dupErr.code === 11000) {
+                        // Contact already exists with this phone — just update it
+                        await Contact.findOneAndUpdate(
+                            { phone: normalizedContactPhone },
+                            { $set: { updated_at: new Date() } }
+                        );
+                    } else {
+                        throw dupErr;
+                    }
+                }
             }
             synced++;
         } catch (err) {
@@ -198,16 +210,29 @@ export async function processNewCalls(userId: string, apiKey: string) {
                 }
 
                 const normalizedContactPhone = normalizePhone(call.caller_number);
-                await Contact.findOneAndUpdate(
-                    {
-                        userId,
-                        $or: [
-                            { phone: call.caller_number },
-                            { phone: normalizedContactPhone }
-                        ]
-                    },
-                    updateOps
-                );
+                try {
+                    await Contact.findOneAndUpdate(
+                        {
+                            userId,
+                            $or: [
+                                { phone: call.caller_number },
+                                { phone: normalizedContactPhone }
+                            ]
+                        },
+                        updateOps
+                    );
+                } catch (dupErr: any) {
+                    if (dupErr.code === 11000) {
+                        // Contact already exists with this phone (possibly under different userId due to indexing)
+                        // Fall back to just updating it by phone
+                        await Contact.findOneAndUpdate(
+                            { phone: normalizedContactPhone },
+                            updateOps
+                        );
+                    } else {
+                        throw dupErr;
+                    }
+                }
             }
 
             if (analysis) {

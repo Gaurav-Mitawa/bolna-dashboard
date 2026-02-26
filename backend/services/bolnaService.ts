@@ -153,7 +153,7 @@ export async function getBatchStatus(user: IUser, batchId: string): Promise<any>
 // Step 3b: Stop a running/scheduled batch
 export async function stopBatch(user: IUser, batchId: string): Promise<any> {
   const apiKey = getApiKey(user);
-  const response = await axios.post(`${BOLNA_HOST}/batches/${batchId}/stop`, null, {
+  const response = await axios.post(`${BOLNA_HOST}/batches/${batchId}/stop`, {}, {
     headers: { Authorization: `Bearer ${apiKey}` },
     timeout: 15000,
   });

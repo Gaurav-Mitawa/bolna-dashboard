@@ -105,40 +105,6 @@ router.post("/verify-payment", isAuthenticated, async (req: Request, res: Respon
   }
 });
 
-// POST /api/subscribe/dev-bypass
-router.post("/dev-bypass", isAuthenticated, async (req: Request, res: Response) => {
-  console.log(`[Subscription] Dev-bypass request from user: ${req.user ? (req.user as any)._id : 'unknown'}`);
-  try {
-    const user = req.user as any;
-    if (!user) {
-      console.error("[Subscription] Dev-bypass failed: req.user is missing despite isAuthenticated");
-      return res.status(401).json({ error: "No user session found" });
-    }
-
-    // Grant 100-year trial
-    const trialStartedAt = new Date();
-    const trialExpiresAt = new Date();
-    trialExpiresAt.setFullYear(trialExpiresAt.getFullYear() + 100);
-
-    const updatedUser = await User.findByIdAndUpdate(user._id, {
-      trialStartedAt,
-      trialExpiresAt,
-      subscriptionStatus: 'active'
-    }, { returnDocument: 'after' });
-
-    if (!updatedUser) {
-      console.error(`[Subscription] Dev-bypass failed: User ${user._id} not found in DB`);
-      return res.status(404).json({ error: "User not found in database" });
-    }
-
-    console.log(`[Subscription] Dev-bypass SUCCESS for user: ${user._id}. Trial expires: ${trialExpiresAt}`);
-    res.json({ success: true, redirect: "/dashboard" });
-  } catch (err: any) {
-    console.error("[Subscription] Dev-bypass error:", err.stack || err.message || err);
-    res.status(500).json({ error: "Bypass failed", details: err.message });
-  }
-});
-
 // POST /api/subscribe/start-trial — 7-day free trial for new users
 router.post("/start-trial", isAuthenticated, async (req: Request, res: Response) => {
   try {
@@ -202,6 +168,7 @@ export async function activateSubscription(
     subscriptionStatus: "active",
     subscriptionExpiresAt: periodEnd,
     currentPeriodStart: periodStart,
+    trialExpiresAt: null, // clear trial — user is now a paid subscriber
   });
 
   console.log(`[Subscription] Activated for user ${userId}, expires ${periodEnd}`);

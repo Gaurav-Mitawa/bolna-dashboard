@@ -284,8 +284,40 @@ router.post(
     } catch (err: any) {
       if (err.response) {
         console.error("Campaign stop Bolna error:", err.response.data);
+
+        // If Bolna rejected, the batch might already be completed/stopped.
+        // Force a sync of the remote status and return success if we updated it.
+        try {
+          const user = req.user as any;
+          const campaign = await Campaign.findOne({ _id: req.params.id, userId: user._id });
+          if (campaign && campaign.batchId) {
+            const bolnaStatus = await bolnaService.getBatchStatus(user, campaign.batchId);
+            const statusMap: Record<string, string> = {
+              scheduled: "scheduled",
+              completed: "completed",
+              failed: "failed",
+              stopped: "stopped",
+            };
+            const newStatus = statusMap[bolnaStatus.status];
+            if (newStatus && campaign.status !== newStatus) {
+              campaign.status = newStatus as any;
+              await campaign.save();
+            }
+            // Return 200 — the campaign status was synced successfully
+            return res.status(200).json({
+              success: true,
+              campaign,
+              message: `Campaign status synced from Bolna: ${campaign.status}`,
+            });
+          }
+        } catch (syncErr) {
+          console.error("Failed to auto-sync campaign status during stop error:", syncErr);
+        }
+
+        // If sync also failed, return the original error
+        const errorMessage = err.response.data.message || err.response.data.detail || "Bolna API Error";
         return res.status(err.response.status).json({
-          error: err.response.data.message || err.response.data.detail || "Bolna API Error"
+          error: `Failed to stop: ${errorMessage}`
         });
       }
       console.error("Campaign stop error:", err);

@@ -134,9 +134,11 @@ export default function SubscribePage() {
             <CardDescription>
               {isSubscribed
                 ? "You have full access to CRM, campaigns, and more."
-                : user?.subscriptionStatus === "expired"
-                  ? "Your subscription has expired. Renew to continue."
-                  : "Get full access to CRM, campaigns, and more."}
+                : user?.subscriptionStatus === "expired" && user?.trialStartedAt
+                  ? "Your 7-day free trial has ended. Subscribe to continue using ClusterX CRM."
+                  : user?.subscriptionStatus === "expired"
+                    ? "Your subscription has expired. Renew to continue."
+                    : "Get full access to CRM, campaigns, and more."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -257,54 +259,7 @@ export default function SubscribePage() {
               </div>
             )}
 
-            {/* Developer Bypass — hidden in production builds */}
-            {import.meta.env.DEV && (
-              <div className="pt-4 border-t border-dashed border-gray-200">
-                <Button
-                  variant="ghost"
-                  className="w-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 text-xs"
-                  onClick={async () => {
-                    console.log("[Subscribe] Bypass button clicked");
-                    try {
-                      setProcessing(true);
-                      const res = await fetch("/api/subscribe/dev-bypass", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                      });
 
-                      if (!res.ok) {
-                        const text = await res.text();
-                        try {
-                          const errData = JSON.parse(text);
-                          toast.error(errData.error || `Server error (${res.status})`);
-                        } catch {
-                          toast.error(`Request failed with status ${res.status}`);
-                        }
-                        return;
-                      }
-
-                      const data = await res.json();
-                      if (data.success) {
-                        toast.success("Developer access granted!");
-                        await refetchUser();
-                        window.location.href = data.redirect || "/dashboard";
-                      } else {
-                        toast.error(data.error || "Bypass failed");
-                      }
-                    } catch (err: any) {
-                      console.error("[Subscribe] Bypass fetch catch:", err);
-                      toast.error("Network error or server unreachable");
-                    } finally {
-                      setProcessing(false);
-                    }
-                  }}
-                  disabled={processing}
-                >
-                  🔧 Skip Payment (Developer Bypass)
-                </Button>
-              </div>
-            )}
           </CardContent>
         </Card>
 

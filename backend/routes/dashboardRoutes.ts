@@ -67,7 +67,7 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     // Last successful payment
     const lastPayment = await Payment.findOne({ userId, status: "success" })
       .sort({ createdAt: -1 })
-      .select("amountPaid couponUsed discountAmount periodStart periodEnd createdAt")
+      .select("amountPaid periodStart periodEnd createdAt")
       .lean();
 
     res.json({
@@ -87,8 +87,6 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
       },
       lastPayment: lastPayment ? {
         amountPaid: lastPayment.amountPaid / 100, // paise → rupees
-        couponUsed: lastPayment.couponUsed,
-        discountAmount: lastPayment.discountAmount / 100,
         periodStart: lastPayment.periodStart,
         periodEnd: lastPayment.periodEnd,
         paidAt: lastPayment.createdAt,

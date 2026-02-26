@@ -1,43 +1,65 @@
-# Razorpay Integration & Billing Amount Display — Walkthrough
+# Subscription & Trial System — Walkthrough
 
-## Changes Made
+## What Changed
 
-### 1. Backend — Last Payment in Dashboard API
-**File:** [dashboardRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/dashboardRoutes.ts)
+### 🔴 Security Fix: Dev-Bypass Removed
 
-- Imported [Payment](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/models/Payment.ts#3-15) model
-- Queries the most recent successful payment for the user
-- Returns `lastPayment` object with: `amountPaid` (₹), `couponUsed`, `discountAmount` (₹), `periodStart`, `periodEnd`, `paidAt`
+The `POST /api/subscribe/dev-bypass` route granted a **100-year subscription** with zero payment. It had no `NODE_ENV` guard — anyone who knew the endpoint could call it in production.
 
-### 2. Frontend — Last Payment Card on Billing Page
-**File:** [Billing.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Billing.tsx)
+**Deleted from:**
+- [subscriptionRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/subscriptionRoutes.ts) — entire route removed
+- [Subscribe.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Subscribe.tsx) — bypass button removed
 
-- Added `lastPayment` to [SubscriptionInfo](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Billing.tsx#29-46) interface
-- Added `CreditCard` and `Tag` icon imports
-- New **"Last Payment"** card between Subscription and Wallet cards showing:
-  - Amount paid (bold ₹ display)
-  - Coupon tag with discount amount (green badge)
-  - Billing period (start — end dates)
-- Card only renders if a payment exists
+---
 
-### 3. Frontend — Razor Checkout Description
-**File:** [Subscribe.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Subscribe.tsx)
+### Trial → Paid Transition Fix
 
-- Razorpay modal description now shows:
-  - With coupon: `"Growth Plan — ₹2,799 (SAVE20 applied)"`
-  - Without coupon: `"Growth Plan — ₹3,499 / month"`
+[activateSubscription()](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/subscriptionRoutes.ts#L145-L176) now sets `trialExpiresAt = null` when a user pays, cleanly transitioning them from trial to paid status.
 
-## Payment Flow Summary
+---
+
+### Stale Coupon References Cleaned
+
+[dashboardRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/dashboardRoutes.ts) — removed `couponUsed` and `discountAmount` from Payment query and API response (coupon feature was previously removed).
+
+---
+
+### Days Remaining on Settings Page
+
+[settingsRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/settingsRoutes.ts) now returns `daysRemaining` and `isTrial`.
+
+[settings.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/settings.tsx) now shows a **4-column** Subscription card: Status, Expires, Days Remaining, and Action. Days turn yellow at ≤7 and red at ≤3.
+
+---
+
+### Trial-Expired Messaging
+
+[Subscribe.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Subscribe.tsx) now shows **"Your 7-day free trial has ended. Subscribe to continue using ClusterX CRM."** when a trial user's access expires.
+
+---
+
+## Files Modified
+
+| File | Change |
+|---|---|
+| [backend/routes/subscriptionRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/subscriptionRoutes.ts) | Deleted dev-bypass route, cleared `trialExpiresAt` on payment |
+| [backend/routes/dashboardRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/dashboardRoutes.ts) | Removed stale `couponUsed`/`discountAmount` |
+| [backend/routes/settingsRoutes.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/routes/settingsRoutes.ts) | Added `daysRemaining` and `isTrial` to response |
+| [client/src/pages/Subscribe.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/Subscribe.tsx) | Removed bypass button, added trial-expired messaging |
+| [client/src/pages/settings.tsx](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/pages/settings.tsx) | Added Days Remaining column, trial-aware description |
+
+## Build Verification
 
 ```
-User clicks Pay → POST /create-order (with coupon) → Razorpay order created at discounted amount
-→ Razorpay modal opens (shows discounted amount + description)
-→ User pays → POST /verify-payment → Payment record saved → Subscription activated
-→ Billing page shows: subscription status + last payment amount + coupon info
+npm run build → ✓ built in 1m 29s (zero errors)
 ```
 
-## Verification
-- `/api/subscribe/config` endpoint exists and returns `razorpayKeyId`
-- Razorpay keys configured in [.env](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/.env) (`rzp_live_...`)
-- [Payment](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/models/Payment.ts#3-15) model already stores `amountPaid`, `couponUsed`, `discountAmount`
-- Coupon discount is deducted server-side before Razorpay order creation
+## Manual Testing Required
+
+Since this project uses Google OAuth + MongoDB Atlas + Razorpay (all external services), full end-to-end testing requires running the dev server locally:
+
+1. **Bypass is gone** — call `POST /api/subscribe/dev-bypass` → should return **404**
+2. **Trial flow** — new user → setup API → start 7-day trial → dashboard access
+3. **Trial expiry** — set `trialExpiresAt` to past date in Atlas → user forced to `/subscribe`
+4. **Payment flow** — pay via Razorpay test card → redirected to dashboard
+5. **Days remaining** — visible on both `/billing` and `/settings`

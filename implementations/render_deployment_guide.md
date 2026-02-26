@@ -1,172 +1,209 @@
-# Deploying Bolna Dashboard on Render
+# 🚀 Bolna Dashboard — Render Deployment Guide
 
-Your project has **two parts** that need separate Render services:
-
-| Part | Type | Directory | What it does |
-|------|------|-----------|-------------|
-| **Backend** | Web Service | `backend/` | Express API on port 5000 (call processor, auto-polling, MongoDB) |
-| **Frontend** | Static Site | `client/` | Vite + React dashboard |
+> Deploy as a **single unified Web Service** — Express serves both API + React frontend.
 
 ---
 
-## Prerequisites
+## 📊 Architecture
 
-- A [Render account](https://render.com) (free tier works)
-- Your repo pushed to **GitHub** (Render deploys from Git)
-- Your MongoDB Atlas cluster IP whitelist set to `0.0.0.0/0` (allow from anywhere) so Render can connect
-
----
-
-## Step 1: Deploy the Backend (Web Service)
-
-1. **Render Dashboard → New → Web Service**
-2. Connect your GitHub repo
-3. Configure:
-
-| Setting | Value |
-|---------|-------|
-| **Name** | `bolna-backend` |
-| **Root Directory** | _(leave blank — it's a monorepo)_ |
-| **Runtime** | `Node` |
-| **Build Command** | `npm install` |
-| **Start Command** | `npx tsx backend/server.ts` |
-| **Instance Type** | Free (or Starter) |
-
-4. **Environment Variables** — click **Add Environment Variable** and add:
-
-| Key | Value |
-|-----|-------|
-| `MONGODB_URI` | `mongodb+srv://...` _(your Atlas connection string)_ |
-| `GROK_API_KEY` | `gsk_...` (Groq) or `xai-...` (Grok) _(System auto-detects)_ |
-| `BOLNA_API_KEY` | `bn-...` _(your Bolna API key)_ |
-| `NODE_ENV` | `production` |
+```
+         Browser (Users)
+              │
+    ┌─────────▼──────────┐
+    │  Render Web Service │
+    │  (Node.js)          │
+    │                     │
+    │  server/index.ts    │
+    │  ├── /api/*  → API  │
+    │  └── /*     → React │
+    └─────────┬───────────┘
+              │
+    ┌─────────▼───────────┐
+    │  MongoDB Atlas       │
+    │  (Cloud Database)    │
+    └──────────────────────┘
+```
 
 > [!IMPORTANT]
-> Do **NOT** commit your [.env](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.env) file to GitHub. Render's environment variables replace your local [.env](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.env) — they are injected at runtime.
-
-5. Click **Create Web Service**
-
-6. Once deployed, note your backend URL — it will be something like:
-   `https://bolna-backend.onrender.com`
+> **Do NOT split into two services** (backend + static site). The auth system uses server-side sessions — splitting breaks `/api/auth/me` because the static site rewrites all requests to `index.html`.
 
 ---
 
-## Step 2: Deploy the Frontend (Static Site)
+## Step 1 — Push Code to GitHub
 
-1. **Render Dashboard → New → Static Site**
-2. Connect the same GitHub repo
-3. Configure:
+Make sure your latest code is pushed:
+
+```bash
+git add .
+git commit -m "Production ready"
+git push origin main
+```
+
+Make sure `.env` is in `.gitignore` (never commit secrets).
+
+---
+
+## Step 2 — Create a Web Service on Render
+
+1. Go to [render.com](https://render.com) → **Dashboard** → **New** → **Web Service**
+2. Connect your **GitHub repo**
+3. Configure these settings:
 
 | Setting | Value |
-|---------|-------|
-| **Name** | `bolna-dashboard` |
-| **Root Directory** | `client` |
+|---|---|
+| **Name** | `bolna-crm` (or whatever you want) |
+| **Region** | Oregon or Singapore (closest to your users) |
+| **Root Directory** | _(leave blank)_ |
+| **Runtime** | `Node` |
 | **Build Command** | `npm install && npm run build` |
-| **Publish Directory** | `client/dist` |
+| **Start Command** | `npx tsx server/index.ts` |
+| **Instance Type** | **Starter ($7/mo)** — Free tier sleeps after 15 min, kills your scheduler |
 
-4. **Environment Variables** — add:
-
-| Key | Value |
-|-----|-------|
-| `VITE_BOLNA_API_KEY` | `bn-...` _(same Bolna API key)_ |
-| `VITE_API_BASE_URL` | `https://bolna-backend.onrender.com` _(your backend URL from Step 1)_ |
-
-> [!TIP]
-> Vite only exposes env vars prefixed with `VITE_` to the frontend build. The `BOLNA_API_KEY` (without prefix) is also needed because [bolnaApi.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/client/src/lib/bolnaApi.ts) checks both `import.meta.env.BOLNA_API_KEY` and `import.meta.env.VITE_BOLNA_API_KEY`.
-
-5. **Add Rewrite Rule** for SPA routing:
-   - Go to **Redirects/Rewrites** tab
-   - Add: Source: `/*` → Destination: [/index.html](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/client/index.html) → Action: **Rewrite**
-   - This ensures React Router works on page refresh
-
-6. Click **Create Static Site**
+4. Click **Create Web Service** (don't add env vars yet — do that in Step 3)
 
 ---
 
-## Step 3: Fix the Bolna API URL Issue
+## Step 3 — Add Environment Variables
 
-> [!CAUTION]
-> Currently `api.bolna.ai` is not resolving (DNS failure). Before deploying, you need to confirm the correct Bolna API URL and update it in:
-> - [backend/services/callPoller.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/backend/services/callPoller.ts) (line 7)
-> - [client/src/lib/bolnaApi.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/client/src/lib/bolnaApi.ts) (line 3)
-> - [client/src/api/bolnaCampaigns.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/client/src/api/bolnaCampaigns.ts) (line 255)
+Go to your service → **Environment** tab → **Add Environment Variable**
 
-If the URL works from Render's servers but not locally, it may be a local DNS/firewall issue — test after deploying.
+Add each one:
+
+| Key | Value | Where to get it |
+|---|---|---|
+| `NODE_ENV` | `production` | Just type it |
+| `PORT` | `5000` | Just type it |
+| `MONGODB_URI` | `mongodb+srv://...` | [cloud.mongodb.com](https://cloud.mongodb.com) → Connect |
+| `SESSION_SECRET` | Random 64-char hex | Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `GOOGLE_CLIENT_ID` | `456216...apps.googleusercontent.com` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+| `GOOGLE_CLIENT_SECRET` | `GOCSPX-...` | Same place |
+| `GOOGLE_CALLBACK_URL` | `https://YOUR-SERVICE.onrender.com/api/auth/google/callback` | Your Render URL + path |
+| `ENCRYPTION_KEY` | Random 64-char hex | Generate same as SESSION_SECRET |
+| `GROK_API_KEY` | `gsk_...` | [console.groq.com](https://console.groq.com) |
+| `RAZORPAY_KEY_ID` | `rzp_test_...` or `rzp_live_...` | [Razorpay Dashboard](https://dashboard.razorpay.com/app/keys) |
+| `RAZORPAY_KEY_SECRET` | Your Razorpay secret | Same place |
+| `RAZORPAY_WEBHOOK_SECRET` | Your webhook secret | Razorpay → Webhooks |
+| `BASE_PLAN_PRICE` | `349900` | Price in paise (₹3,499) |
+
+> After adding all vars, Render will **auto-restart** the service.
 
 ---
 
-## Step 4: Verify
+## Step 4 — Update Google OAuth Redirect URI
 
-1. **Backend health check** — visit `https://bolna-backend.onrender.com/api/processed-calls` in your browser. You should get a JSON response (empty array `[]` is fine).
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Click on your OAuth 2.0 Client ID
+3. Under **Authorized redirect URIs**, add:
+   ```
+   https://YOUR-SERVICE.onrender.com/api/auth/google/callback
+   ```
+4. Click **Save**
 
-2. **Frontend** — visit your static site URL (e.g. `https://bolna-dashboard.onrender.com`). The dashboard should load and connect to the backend.
-
-3. **Check Render logs** — click on each service → **Logs** tab to see startup output and auto-polling logs.
+> [!IMPORTANT]
+> The callback URL must **exactly match** what you put in `GOOGLE_CALLBACK_URL` env var — including `https://` and the path.
 
 ---
 
-## Architecture on Render
+## Step 5 — Whitelist Render in MongoDB Atlas
 
-```mermaid
-graph LR
-    User[Browser] --> FE[Static Site<br/>bolna-dashboard]
-    FE -->|/api/*| BE[Web Service<br/>bolna-backend]
-    BE --> MongoDB[(MongoDB Atlas)]
-    BE --> Bolna[Bolna API]
-    BE --> Grok[Grok API]
-    FE -->|Direct| Bolna
+1. Go to [cloud.mongodb.com](https://cloud.mongodb.com) → **Network Access**
+2. Click **Add IP Address**
+3. Add `0.0.0.0/0` (Allow from anywhere)
+   - Render uses dynamic IPs, so you can't whitelist a specific IP
+   - Your MongoDB password protects access
+
+---
+
+## Step 6 — Set Up Razorpay Webhook
+
+1. Go to [Razorpay Dashboard](https://dashboard.razorpay.com) → **Settings** → **Webhooks**
+2. Click **Add New Webhook**
+3. Fill in:
+
+| Field | Value |
+|---|---|
+| **Webhook URL** | `https://YOUR-SERVICE.onrender.com/api/webhooks/razorpay` |
+| **Secret** | Same value as your `RAZORPAY_WEBHOOK_SECRET` env var |
+| **Active Events** | ✅ `payment.captured` |
+
+4. Click **Create Webhook**
+
+---
+
+## Step 7 — Verify Deployment
+
+### 7a. Check Service is Running
+- Render Dashboard → your service → **Logs** tab
+- Look for: `serving on port 5000`
+- Look for: `[MongoDB] Connected`
+- Look for: `[AutoPoll] Starting polling every 300s`
+
+### 7b. Test Health Check
+Visit in browser:
+```
+https://YOUR-SERVICE.onrender.com/api/auth/health
+```
+Should return:
+```json
+{ "status": "ok", "db": "connected", "timestamp": "..." }
 ```
 
----
-
-## Common Issues
-
-| Issue | Fix |
-|-------|-----|
-| Backend sleeps on free tier | Render free tier spins down after 15 min inactivity. Auto-polling won't run when sleeping. Upgrade to Starter ($7/mo) for always-on. |
-| Frontend API calls fail with CORS | Make sure your backend has `cors()` middleware enabled (it does — [server.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/backend/server.ts) line 23). |
-| Frontend shows blank page | Check that the Rewrite rule `/* → /index.html` is configured. |
-| `ENOTFOUND api.bolna.ai` | The Bolna API domain isn't resolving — confirm the correct URL with Bolna. |
-| Build fails on `client` | The root [package.json](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/package.json) has all deps. Set root directory to `client` and ensure [client/package.json](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/client/package.json) has all the required dependencies. |
+### 7c. Test the Full Flow
+1. Visit `https://YOUR-SERVICE.onrender.com`
+2. Click **Sign in with Google**
+3. Should redirect to setup/subscribe/dashboard based on your account state
+4. Go to `/subscribe` → test a payment with test card `4111 1111 1111 1111`
 
 ---
 
-## Optional: Use a `render.yaml` Blueprint
+## Step 8 — If You Had the Old Two-Service Setup
 
-Instead of manual setup, you can create a `render.yaml` in your repo root for Infrastructure-as-Code:
+If you previously deployed as two separate services (backend + static site):
 
-```yaml
-services:
-  - type: web
-    name: bolna-backend
-    runtime: node
-    buildCommand: npm install
-    startCommand: npx tsx backend/server.ts
-    envVars:
-      - key: MONGODB_URI
-        sync: false
-      - key: GROK_API_KEY
-        sync: false
-      - key: BOLNA_API_KEY
-        sync: false
-      - key: NODE_ENV
-        value: production
+1. **Delete** the Static Site (`bolna-dashboard`) from Render
+2. **Update** the existing Web Service:
+   - Build Command → `npm install && npm run build`
+   - Start Command → `npx tsx server/index.ts`
+3. Add any missing env vars from Step 3
+4. **Trigger a manual deploy** → go to service → **Manual Deploy** → **Deploy latest commit**
 
-  - type: web
-    name: bolna-dashboard
-    runtime: static
-    rootDir: client
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_BOLNA_API_KEY
-        sync: false
-      - key: VITE_API_BASE_URL
-        sync: false
-```
+---
 
-Then go to **Render Dashboard → Blueprints → New Blueprint Instance** and point to your repo.
+## ✅ Post-Deployment Checklist
+
+| Task | How to verify |
+|---|---|
+| ✅ Site loads | Visit `https://YOUR-SERVICE.onrender.com` |
+| ✅ Health check passes | Visit `/api/auth/health` → `{"status":"ok","db":"connected"}` |
+| ✅ Google OAuth works | Click "Sign in with Google" |
+| ✅ Dashboard loads after login | Navigate to `/dashboard` |
+| ✅ Razorpay payment works | Go to `/subscribe` → test payment |
+| ✅ Scheduler is running | Check logs for `[AutoPoll]` messages |
+| ✅ No auth errors | No `<!DOCTYPE` errors in browser console |
+
+---
+
+## 🧯 Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| **`<!DOCTYPE` auth error** | You're running two services. Switch to single service (this guide). |
+| **502 Bad Gateway** | Service crashed. Check **Logs** tab. Usually a missing env var. |
+| **Google OAuth fails** | `GOOGLE_CALLBACK_URL` must exactly match Google Cloud Console redirect URI. |
+| **Razorpay fails** | Check `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in env vars. |
+| **MongoDB won't connect** | Check Atlas Network Access → `0.0.0.0/0` must be whitelisted. |
+| **Service sleeps** | Free tier sleeps after 15 min. Upgrade to Starter ($7/mo). |
+| **Build fails** | Check that `npm run build` works locally first. |
+| **Scheduler not running** | Only runs on always-on instances (Starter+). Free tier kills it. |
+
+---
+
+## 💰 Render Cost
+
+| Plan | Monthly | Always-on? | Good for |
+|---|---|---|---|
+| **Free** | $0 | ❌ Sleeps after 15 min | Quick demo only |
+| **Starter** | $7 | ✅ Yes | Production (1-10 users) |
+| **Standard** | $25 | ✅ Yes | Production (10-50 users) |
+
++ MongoDB Atlas M0: **Free** (512MB, good for up to ~20 users)
