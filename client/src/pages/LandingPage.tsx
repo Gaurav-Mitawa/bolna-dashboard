@@ -132,18 +132,30 @@ export default function LandingPage() {
     }
   };
 
+  // Calendly link
+  const CALENDLY_URL = "https://calendly.com/gauravsmitawa-4svx/30min";
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-lg">
-              CX
-            </div>
-            <span className="text-xl font-semibold text-gray-900">Cluster X</span>
+            <img 
+              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/4f1g8t6m_log.png" 
+              alt="Cluster X" 
+              className="h-10 w-auto"
+            />
           </div>
           <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              className="text-gray-600 hover:text-gray-900"
+              onClick={() => window.open(CALENDLY_URL, "_blank")}
+              data-testid="nav-book-demo-btn"
+            >
+              Book A Demo
+            </Button>
             <Button 
               variant="ghost" 
               className="text-gray-600 hover:text-gray-900"
