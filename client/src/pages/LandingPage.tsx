@@ -335,17 +335,27 @@ export default function LandingPage() {
               Simple, Transparent Pricing
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Pay only for connected calls. No hidden fees.
+              Everything you need to scale your voice operations
             </p>
           </div>
           
           <div className="bg-white rounded-3xl border-2 border-primary/20 p-8 md:p-12 shadow-lg">
             <div className="text-center mb-8">
               <div className="inline-flex items-baseline gap-1">
-                <span className="text-5xl md:text-6xl font-bold text-gray-900">$0.08</span>
-                <span className="text-xl text-gray-500">/minute</span>
+                <span className="text-2xl text-gray-500">₹</span>
+                <span className="text-5xl md:text-6xl font-bold text-gray-900">3,499</span>
+                <span className="text-xl text-gray-500">/month</span>
               </div>
-              <p className="text-gray-600 mt-2">for connected calls</p>
+              <p className="text-gray-600 mt-2">Platform subscription</p>
+              
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <div className="inline-flex items-baseline gap-1">
+                  <span className="text-xl text-gray-500">+</span>
+                  <span className="text-3xl font-bold text-primary">$0.08</span>
+                  <span className="text-lg text-gray-500">/minute</span>
+                </div>
+                <p className="text-gray-600 mt-1">Voice agent cost per connected call</p>
+              </div>
             </div>
             
             <div className="grid md:grid-cols-2 gap-4 mb-8">
