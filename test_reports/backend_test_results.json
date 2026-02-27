@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-02-27T12:39:02.646327",
+  "total_tests": 1,
+  "passed_tests": 0,
+  "success_rate": 0.0,
+  "results": [
+    {
+      "test": "Server Health",
+      "success": false,
+      "details": "Unexpected status for GET: 200",
+      "timestamp": "2026-02-27T12:39:02.646119"
+    }
+  ]
+}
