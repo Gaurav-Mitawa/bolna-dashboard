@@ -144,7 +144,7 @@ export default function LandingPage() {
             <img 
               src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
               alt="Cluster X" 
-              className="h-[55px] w-auto"
+              className="h-[48px] w-auto"
             />
           </div>
           <div className="flex items-center gap-4">
@@ -425,7 +425,7 @@ export default function LandingPage() {
             <img 
               src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
               alt="Cluster X" 
-              className="h-[44px] w-auto"
+              className="h-[38px] w-auto"
             />
             <span className="text-gray-600">© 2025 Cluster X. All rights reserved.</span>
           </div>
