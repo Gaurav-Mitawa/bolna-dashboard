@@ -142,7 +142,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img 
-              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/4f1g8t6m_log.png" 
+              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
               alt="Cluster X" 
               className="h-[46px] w-auto"
             />
@@ -423,7 +423,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img 
-              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/4f1g8t6m_log.png" 
+              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
               alt="Cluster X" 
               className="h-[37px] w-auto"
             />
