@@ -7,6 +7,7 @@ import AppShell from "@/components/layout/AppShell";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Pages
+import LandingPage from "@/pages/LandingPage";
 import DashboardPage from "@/pages/Dashboard";
 import CustomersPage from "@/pages/customers";
 import CampaignsPage from "@/pages/campaigns";
@@ -40,15 +41,20 @@ function AppContent() {
     );
   }
 
+  // Landing page — public route (show to unauthenticated users at root)
+  if (location === "/" && !isAuthenticated) {
+    return <LandingPage />;
+  }
+
   // Public routes — accessible without authentication
   if (location === "/login" || location.startsWith("/login")) {
     if (isAuthenticated) return <Redirect to="/dashboard" />;
     return <LoginPage />;
   }
 
-  // Not authenticated → send to login
+  // Not authenticated → send to landing page (except for /login which is handled above)
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return <LandingPage />;
   }
 
   // Authenticated but no Bolna key → setup-api
