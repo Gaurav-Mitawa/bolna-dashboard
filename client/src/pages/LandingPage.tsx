@@ -419,13 +419,13 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-6 border-t border-gray-200">
+      <footer className="py-4 px-6 border-t border-gray-200">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img 
               src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
               alt="Cluster X" 
-              className="h-[38px] w-auto"
+              className="h-[42px] w-auto"
             />
             <span className="text-gray-600">© 2025 Cluster X. All rights reserved.</span>
           </div>
