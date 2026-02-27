@@ -388,6 +388,16 @@ export default function LandingPage() {
             <Button 
               size="lg"
               className="bg-primary hover:bg-primary/90 text-white px-8"
+              onClick={() => window.open(CALENDLY_URL, "_blank")}
+              data-testid="cta-book-demo-btn"
+            >
+              Book A Demo
+              <Calendar className="w-4 h-4 ml-2" />
+            </Button>
+            <Button 
+              size="lg"
+              variant="outline"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
               onClick={() => setLocation("/login")}
               data-testid="cta-get-started-btn"
             >
@@ -412,9 +422,11 @@ export default function LandingPage() {
       <footer className="py-8 px-6 border-t border-gray-200">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-sm">
-              CX
-            </div>
+            <img 
+              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/4f1g8t6m_log.png" 
+              alt="Cluster X" 
+              className="h-8 w-auto"
+            />
             <span className="text-gray-600">© 2025 Cluster X. All rights reserved.</span>
           </div>
           <div className="flex items-center gap-6">
