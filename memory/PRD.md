@@ -53,6 +53,14 @@ Create a landing page for AI Agent analytics dashboard before the login/signup p
 - Updated `/app/client/src/App.tsx` to show landing page for unauthenticated users
 - Updated `/app/backend/server.ts` to mount demo routes
 
+### Landing Page Updates - 27 Jan 2026
+- Added CRM feature with screenshot image
+- Added Inbound & Outbound Campaigns feature with dashboard screenshot
+- Added Booking System feature
+- Added Smart AI Dashboard feature
+- Added Pricing Section: $0.08/minute for connected calls
+- Pricing includes: Booking System, CRM, Smart AI Dashboard, Inbound/Outbound Campaigns, Multi-language Support, 24/7 AI Agents, Real-time Analytics
+
 ### Deployment Fixes - 27 Jan 2026
 - Fixed hardcoded localhost URLs in `/app/client/src/api/shared/baseClient.ts`
 - Created `/app/proxy.js` for port 3000 -> 8001 forwarding
