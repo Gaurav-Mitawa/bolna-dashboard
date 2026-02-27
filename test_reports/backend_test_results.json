@@ -1,14 +1,32 @@
 {
-  "timestamp": "2026-02-27T12:39:02.646327",
-  "total_tests": 1,
-  "passed_tests": 0,
-  "success_rate": 0.0,
+  "timestamp": "2026-02-27T12:39:38.860240",
+  "total_tests": 4,
+  "passed_tests": 3,
+  "success_rate": 75.0,
   "results": [
     {
       "test": "Server Health",
+      "success": true,
+      "details": "Server responding (status: 200)",
+      "timestamp": "2026-02-27T12:39:37.525336"
+    },
+    {
+      "test": "Demo Call - Valid Phone",
       "success": false,
-      "details": "Unexpected status for GET: 200",
-      "timestamp": "2026-02-27T12:39:02.646119"
+      "details": "Unexpected status 500: {\"error\":\"Failed to initiate demo call. Please try again later.\"}",
+      "timestamp": "2026-02-27T12:39:38.849816"
+    },
+    {
+      "test": "Demo Call - Invalid Phone Numbers",
+      "success": true,
+      "details": "All invalid phone numbers correctly rejected",
+      "timestamp": "2026-02-27T12:39:38.858349"
+    },
+    {
+      "test": "Demo Call - Missing Phone",
+      "success": true,
+      "details": "Correctly rejects missing phone number",
+      "timestamp": "2026-02-27T12:39:38.860076"
     }
   ]
 }
