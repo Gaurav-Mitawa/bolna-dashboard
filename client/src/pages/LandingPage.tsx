@@ -278,26 +278,87 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Features That Matter
+              Powerful Features
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Everything you need to scale your voice operations
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 gap-8">
             {FEATURES.map((feature, index) => (
               <div 
                 key={index}
-                className="p-6 bg-white rounded-2xl border border-gray-200 hover:shadow-lg transition-all duration-300"
+                className="bg-white rounded-2xl border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden"
                 data-testid={`feature-${index}`}
               >
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6 text-primary" />
+                {feature.image && (
+                  <div className="w-full h-48 overflow-hidden bg-gray-100">
+                    <img 
+                      src={feature.image} 
+                      alt={feature.title}
+                      className="w-full h-full object-cover object-top"
+                    />
+                  </div>
+                )}
+                <div className="p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <feature.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">{feature.title}</h3>
+                  </div>
+                  <p className="text-gray-600">{feature.description}</p>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Pay only for connected calls. No hidden fees.
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-3xl border-2 border-primary/20 p-8 md:p-12 shadow-lg">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-baseline gap-1">
+                <span className="text-5xl md:text-6xl font-bold text-gray-900">$0.08</span>
+                <span className="text-xl text-gray-500">/minute</span>
+              </div>
+              <p className="text-gray-600 mt-2">for connected calls</p>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-4 mb-8">
+              {PRICING_FEATURES.map((feature, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-4 h-4 text-primary" />
+                  </div>
+                  <span className="text-gray-700">{feature}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div className="text-center">
+              <Button 
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-white px-12"
+                onClick={() => setLocation("/login")}
+                data-testid="pricing-get-started-btn"
+              >
+                Get Started Free
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+              <p className="text-sm text-gray-500 mt-4">7-day free trial • No credit card required</p>
+            </div>
           </div>
         </div>
       </section>
