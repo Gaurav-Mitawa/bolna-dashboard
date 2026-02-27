@@ -30,8 +30,12 @@ router.post("/call", async (req: Request, res: Response) => {
     const demoApiKey = process.env.DEMO_BOLNA_API_KEY || process.env.BOLNA_API_KEY;
     const demoFromNumber = process.env.DEMO_FROM_PHONE_NUMBER;
 
-    if (!demoAgentId || !demoApiKey) {
-      console.error("[DemoRoutes] Missing DEMO_AGENT_ID or DEMO_BOLNA_API_KEY");
+    // Check for missing or placeholder credentials
+    const isPlaceholder = (val: string | undefined) => 
+      !val || val.startsWith('your-') || val === '';
+    
+    if (isPlaceholder(demoAgentId) || isPlaceholder(demoApiKey)) {
+      console.error("[DemoRoutes] Missing or placeholder DEMO_AGENT_ID or DEMO_BOLNA_API_KEY");
       return res.status(503).json({ 
         error: "Demo service is not configured. Please contact support." 
       });
