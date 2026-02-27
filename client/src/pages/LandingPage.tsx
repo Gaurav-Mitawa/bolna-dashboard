@@ -49,25 +49,39 @@ const STATS = [
 // Features data
 const FEATURES = [
   { 
-    title: "Smart Lead Qualification", 
-    description: "AI agents that qualify leads 24/7 with human-like conversations",
-    icon: Users 
+    title: "CRM", 
+    description: "Manage your leads and customer relationships with our integrated CRM system",
+    icon: Database,
+    image: "https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/jt453786_Screenshot%202026-02-27%20at%208.41.18%E2%80%AFPM.png"
   },
   { 
-    title: "Multi-language Support", 
-    description: "Speak to your customers in 20+ languages with native fluency",
-    icon: Headphones 
+    title: "Inbound & Outbound Campaigns", 
+    description: "Run powerful call campaigns with AI-powered analytics and insights",
+    icon: PhoneCall,
+    image: "https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/fi58st0w_Screenshot%202026-02-27%20at%208.40.23%E2%80%AFPM.png"
   },
   { 
-    title: "Real-time Analytics", 
-    description: "Track every call, conversion, and insight in real-time",
+    title: "Booking System", 
+    description: "Let your AI agents book appointments and manage calendars automatically",
+    icon: Calendar 
+  },
+  { 
+    title: "Smart AI Dashboard", 
+    description: "Track every call, conversion, and insight with real-time analytics",
     icon: BarChart3 
   },
-  { 
-    title: "Instant Deployment", 
-    description: "Go live in minutes with our pre-built voice agent templates",
-    icon: Zap 
-  },
+];
+
+// Pricing features
+const PRICING_FEATURES = [
+  "Booking System",
+  "CRM",
+  "Smart AI Dashboard",
+  "Inbound Call Campaigns",
+  "Outbound Call Campaigns",
+  "Multi-language Support",
+  "24/7 AI Agents",
+  "Real-time Analytics",
 ];
 
 export default function LandingPage() {
