@@ -10,10 +10,11 @@ Create a landing page for AI Agent analytics dashboard before the login/signup p
 
 ## Architecture
 - **Frontend**: React + TypeScript + Vite + TailwindCSS
-- **Backend**: Express.js + TypeScript
+- **Backend**: Express.js + TypeScript (Unified server on port 8001)
 - **Database**: MongoDB
 - **Voice AI**: Bolna API integration
 - **Auth**: Google OAuth
+- **Preview Proxy**: Node.js proxy on port 3000 -> 8001
 
 ## User Personas
 1. **Business Decision Makers**: Looking to automate voice operations
@@ -52,19 +53,34 @@ Create a landing page for AI Agent analytics dashboard before the login/signup p
 - Updated `/app/client/src/App.tsx` to show landing page for unauthenticated users
 - Updated `/app/backend/server.ts` to mount demo routes
 
+### Deployment Fixes - 27 Jan 2026
+- Fixed hardcoded localhost URLs in `/app/client/src/api/shared/baseClient.ts`
+- Created `/app/proxy.js` for port 3000 -> 8001 forwarding
+- Built production assets in `/app/dist/`
+
 ## Environment Configuration
 Required in `.env`:
 ```
-DEMO_AGENT_ID=<your-bolna-agent-id>
-DEMO_BOLNA_API_KEY=<your-bolna-api-key>
-DEMO_FROM_PHONE_NUMBER=<optional-caller-id>
+PORT=8001
+NODE_ENV=production
+DEMO_AGENT_ID=f0c30eba-25b0-478c-a48d-7c7469022e01
+DEMO_BOLNA_API_KEY=bn-xxxxx
+```
+
+## Running the Application
+```bash
+# Start backend (port 8001)
+cd /app && npx tsx backend/server.ts &
+
+# Start proxy (port 3000 -> 8001)
+node /app/proxy.js &
 ```
 
 ## Prioritized Backlog
 
-### P0 - Critical (Next Session)
-- Configure actual Bolna demo agent credentials
-- Test end-to-end demo call flow
+### P0 - Critical (Completed)
+- ✅ Configure Bolna demo agent credentials
+- ✅ Test end-to-end demo call flow
 
 ### P1 - High Priority
 - Add testimonials/social proof section
@@ -79,7 +95,6 @@ DEMO_FROM_PHONE_NUMBER=<optional-caller-id>
 - SEO optimization
 
 ## Next Tasks
-1. User needs to provide Bolna API credentials (DEMO_AGENT_ID, DEMO_BOLNA_API_KEY)
-2. Configure demo agent in Bolna dashboard
-3. Test demo call flow with real phone number
-4. Add custom tagline/value proposition when provided
+1. Test demo call flow with your phone number
+2. Add custom tagline/value proposition when provided
+3. Consider adding testimonials section
