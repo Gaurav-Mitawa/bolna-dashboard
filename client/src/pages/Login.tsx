@@ -27,10 +27,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-xl">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-600 text-white mb-4 text-2xl font-bold">
-            CX
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Cluster X</h1>
+          <img 
+            src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
+            alt="Cluster X" 
+            className="h-16 w-auto mx-auto mb-4"
+          />
           <p className="text-gray-500 mt-1 text-sm">Voice AI Campaign Platform</p>
         </div>
 
