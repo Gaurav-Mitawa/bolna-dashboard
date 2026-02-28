@@ -399,7 +399,7 @@ export default function LandingPage() {
                 <div className="mt-6 pt-6 border-t border-gray-100 inline-block">
                   <div className="inline-flex items-baseline gap-1 bg-primary/5 px-6 py-3 rounded-2xl">
                     <span className="text-lg text-gray-500">+</span>
-                    <span className="text-3xl font-bold text-primary">$0.08</span>
+                    <span className="text-3xl font-bold text-primary">₹5</span>
                     <span className="text-lg text-gray-500">/minute</span>
                   </div>
                   <p className="text-gray-600 mt-2">Voice agent cost per connected call</p>
