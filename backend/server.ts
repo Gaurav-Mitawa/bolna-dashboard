@@ -28,6 +28,7 @@ import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import setupRoutes from "./routes/setupRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
+import demoRoutes from "./routes/demoRoutes.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -80,6 +81,7 @@ app.use("/api/bolna", bolnaRoutes);
 app.use("/api/subscribe", subscriptionRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/setup-api", setupRoutes);
+app.use("/api/demo", demoRoutes);
 
 // Webhook route needs raw body for Razorpay HMAC verification
 app.use(

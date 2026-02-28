@@ -7,11 +7,11 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 // API version configuration
 export const API_CONFIG = {
   v1: {
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     version: 'v1',
   },
   v2: {
-    baseURL: import.meta.env.VITE_API_V2_BASE_URL || 'http://localhost:8000/api',
+    baseURL: import.meta.env.VITE_API_V2_BASE_URL || '/api',
     version: 'v2',
   },
 };
