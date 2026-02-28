@@ -68,6 +68,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       const data = await res.json();
+
+      if (data.authenticated === false) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
       setUser(data);
     } catch (err) {
       console.error('Auth check failed:', err);

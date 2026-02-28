@@ -55,13 +55,14 @@ router.get("/health", (_req: Request, res: Response) => {
 router.get("/me", (req: Request, res: Response) => {
   try {
     if (!req.isAuthenticated || !req.isAuthenticated()) {
-      return res.status(401).json({ error: "Not authenticated" });
+      return res.status(200).json({ authenticated: false, error: "Not authenticated" });
     }
     const user = req.user as any;
     if (!user) {
-      return res.status(401).json({ error: "No user in session" });
+      return res.status(200).json({ authenticated: false, error: "No user in session" });
     }
     res.json({
+      authenticated: true,
       id: user._id,
       name: user.name,
       email: user.email,
