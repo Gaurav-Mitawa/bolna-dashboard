@@ -16,14 +16,18 @@ router.get("/", isAuthenticated, (req: Request, res: Response) => {
 
   // Calculate days remaining
   const now = Date.now();
+  // Helper for calendar day calculation
+  const getMidnight = (d: number | Date | string) => new Date(new Date(d).setHours(0, 0, 0, 0)).getTime();
+  const todayMidnight = getMidnight(now);
+
   let daysRemaining = 0;
   let isTrial = false;
 
   if (user.trialExpiresAt && new Date(user.trialExpiresAt).getTime() > now) {
-    daysRemaining = Math.ceil((new Date(user.trialExpiresAt).getTime() - now) / (1000 * 60 * 60 * 24));
+    daysRemaining = Math.round((getMidnight(user.trialExpiresAt) - todayMidnight) / (1000 * 60 * 60 * 24));
     isTrial = true;
   } else if (user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt).getTime() > now) {
-    daysRemaining = Math.ceil((new Date(user.subscriptionExpiresAt).getTime() - now) / (1000 * 60 * 60 * 24));
+    daysRemaining = Math.round((getMidnight(user.subscriptionExpiresAt) - todayMidnight) / (1000 * 60 * 60 * 24));
   }
 
   res.json({

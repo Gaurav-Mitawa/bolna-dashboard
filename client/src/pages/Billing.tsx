@@ -180,7 +180,7 @@ export default function BillingPage() {
                 <Button
                   size="sm"
                   className="bg-orange-500 hover:bg-orange-600"
-                  onClick={() => (window.location.href = "/subscribe")}
+                  onClick={() => (window.location.href = "/subscription")}
                 >
                   Subscribe Now
                 </Button>

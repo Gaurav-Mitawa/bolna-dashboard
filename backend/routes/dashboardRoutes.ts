@@ -46,14 +46,18 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     const trialExpiresAt = user.trialExpiresAt;
     const now = Date.now();
 
+    // Helper for calendar day calculation
+    const getMidnight = (d: number | Date | string) => new Date(new Date(d).setHours(0, 0, 0, 0)).getTime();
+    const todayMidnight = getMidnight(now);
+
     let daysLeft = 0;
     let isTrial = false;
 
     if (trialExpiresAt && new Date(trialExpiresAt).getTime() > now) {
-      daysLeft = Math.ceil((new Date(trialExpiresAt).getTime() - now) / (1000 * 60 * 60 * 24));
+      daysLeft = Math.round((getMidnight(trialExpiresAt) - todayMidnight) / (1000 * 60 * 60 * 24));
       isTrial = true;
     } else if (expiresAt && new Date(expiresAt).getTime() > now) {
-      daysLeft = Math.ceil((new Date(expiresAt).getTime() - now) / (1000 * 60 * 60 * 24));
+      daysLeft = Math.round((getMidnight(expiresAt) - todayMidnight) / (1000 * 60 * 60 * 24));
     }
 
     // Bolna key info — masked, never expose decrypted key

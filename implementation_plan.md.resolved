@@ -1,0 +1,33 @@
+# Extract Name from Transcript and Display in Bookings
+
+The goal is to extract the caller's name using the LLM when it analyzes the transcript, save it to the database, and display it in the bookings list.
+
+## Proposed Changes
+
+### Backend - LLM Processing
+#### [MODIFY] llmService.ts (file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/services/llmService.ts)
+- Update the [LLMAnalysis](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/services/llmService.ts#7-18) interface to include `contact_name: string | null`.
+- Update the `SYSTEM_PROMPT` JSON structure to ask for `"contact_name": "Extracted name of the person from the transcript or null if not mentioned"`.
+
+### Backend - Call Processing and DB
+#### [MODIFY] Call.ts (file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/models/Call.ts)
+- Update the `ICall.llm_analysis` TypeScript interface to include `contact_name: string | null`.
+
+#### [MODIFY] callProcessor.ts (file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/services/callProcessor.ts)
+- When updating the [Contact](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/models/Contact.ts#3-18) model after a successful LLM analysis, if `analysis.contact_name` is present, set `updateOps.$set.name = analysis.contact_name`.
+- Add logic to also use `findOneAndUpdate` on the [Customer](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/models/Customer.ts#11-21) collection using `userId` and `phoneNumber` (normalized). Update `status` to match the intent, append a summary to `pastConversations`, and set the `name` to `analysis.contact_name` if found. This ensures the extracted name reaches the CRM Customers immediately without relying solely on the Bolna API Sync.
+
+### Frontend - Bookings Page
+#### [MODIFY] bookings.ts (file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/api/bookings.ts)
+- Update the `RawCall.llm_analysis` TypeScript interface to include `contact_name: string | null`.
+- In [callToBooking](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/client/src/api/bookings.ts#65-114), change `contact_name: call.caller_number || "Unknown"` to `contact_name: analysis?.contact_name || call.caller_number || "Unknown"`. This ensures the extracted name is displayed on the `/bookings` page.
+
+## Verification Plan
+
+### Automated Tests
+- We will verify that TypeScript compilation succeeds in both client and backend to ensure no type mismatch.
+
+### Manual Verification
+- A manual call to the LLM analyzer ([llmService.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/services/llmService.ts)) or running the Bolna caller simulation with a dummy transcript containing a name (e.g. "Hi, my name is John...") will be used.
+- We will verify that the database updates the Contact name to "John".
+- We will check the Bookings frontend to see if "John" is displayed under the name column instead of just the phone number.

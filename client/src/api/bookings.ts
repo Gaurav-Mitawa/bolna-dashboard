@@ -48,6 +48,7 @@ interface RawCall {
   llm_analysis: {
     summary: string;
     intent: string;
+    contact_name?: string | null;
     call_direction: string;
     booking: {
       is_booked: boolean;
@@ -90,7 +91,7 @@ function callToBooking(call: RawCall): Booking {
 
   return {
     id: call.call_id,
-    contact_name: call.caller_number || "Unknown",
+    contact_name: analysis?.contact_name || call.caller_number || "Unknown",
     service_name: analysis?.summary || "Call",
     service_date: serviceDate,
     service_time: serviceTime,

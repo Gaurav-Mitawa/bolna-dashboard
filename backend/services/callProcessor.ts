@@ -7,6 +7,7 @@ import { pollNewCalls } from "./callPoller.js";
 import { analyzeTranscript } from "./llmService.js";
 import { Call } from "../models/Call.js";
 import { Contact } from "../models/Contact.js";
+import { Customer } from "../models/Customer.js";
 import { normalizePhone } from "../utils/phoneUtils.js";
 
 const DELAY_BETWEEN_CALLS_MS = 10_000; // 10s pause between each LLM call
@@ -208,6 +209,9 @@ export async function processNewCalls(userId: string, apiKey: string) {
                 if (status !== "fresh") {
                     updateOps.$set.tag = status;
                 }
+                if (analysis.contact_name) {
+                    updateOps.$set.name = analysis.contact_name;
+                }
 
                 const normalizedContactPhone = normalizePhone(call.caller_number);
                 try {
@@ -232,6 +236,43 @@ export async function processNewCalls(userId: string, apiKey: string) {
                     } else {
                         throw dupErr;
                     }
+                }
+
+                // ALSO UPDATE THE CUSTOMER COLLECTION
+                try {
+                    const customerUpdateOps: any = {
+                        $set: {
+                            updatedAt: new Date()
+                        }
+                    };
+
+                    if (status !== "fresh") {
+                        customerUpdateOps.$set.status = status;
+                    }
+                    if (analysis.contact_name) {
+                        customerUpdateOps.$set.name = analysis.contact_name;
+                    }
+
+                    // Add summary to pastConversations if present
+                    if (analysis.summary) {
+                        customerUpdateOps.$push = {
+                            pastConversations: {
+                                date: new Date(call.call_timestamp),
+                                summary: analysis.summary,
+                                notes: call.transcript || "No transcript available",
+                            }
+                        };
+                    }
+
+                    await Customer.findOneAndUpdate(
+                        {
+                            userId,
+                            phoneNumber: normalizedContactPhone
+                        },
+                        customerUpdateOps
+                    );
+                } catch (customerErr: any) {
+                    console.error(`[Processor] Phase 2 Customer Update Error on ${call.call_id}:`, customerErr);
                 }
             }
 

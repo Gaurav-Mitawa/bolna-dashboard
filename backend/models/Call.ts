@@ -23,6 +23,7 @@ export interface ICall extends Document {
     llm_analysis: {
         summary: string;
         intent: string;
+        contact_name: string | null;
         booking: {
             is_booked: boolean;
             date: string | null;

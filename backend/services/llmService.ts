@@ -7,6 +7,7 @@
 export interface LLMAnalysis {
     summary: string;
     intent: string;
+    contact_name: string | null;
     call_direction: string;
     booking: {
         is_booked: boolean;
@@ -22,6 +23,7 @@ Given the transcript below, return ONLY a valid JSON object with exactly these f
 {
   "summary": "2-3 sentence summary of the call",
   "intent": "one of: queries / booked / interested / not_interested / follow_up",
+  "contact_name": "extracted name of the person from the transcript, or null if not explicitly mentioned",
   "call_direction": "inbound or outbound - infer from who initiated the conversation and context",
   "booking": {
     "is_booked": true or false,
