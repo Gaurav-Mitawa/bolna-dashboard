@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { apiClientV1 } from "@/api/shared/baseClient";
 
 // Country codes for phone input
 const COUNTRY_CODES = [
@@ -48,27 +49,27 @@ const STATS = [
 
 // Features data
 const FEATURES = [
-  { 
-    title: "CRM", 
+  {
+    title: "CRM",
     description: "Manage your leads and customer relationships with our integrated CRM system",
     icon: Database,
     image: "https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/jt453786_Screenshot%202026-02-27%20at%208.41.18%E2%80%AFPM.png"
   },
-  { 
-    title: "Inbound & Outbound Campaigns", 
+  {
+    title: "Inbound & Outbound Campaigns",
     description: "Run powerful call campaigns with AI-powered analytics and insights",
     icon: PhoneCall,
     image: "https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/fi58st0w_Screenshot%202026-02-27%20at%208.40.23%E2%80%AFPM.png"
   },
-  { 
-    title: "Booking System", 
+  {
+    title: "Booking System",
     description: "Let your AI agents book appointments and manage calendars automatically",
-    icon: Calendar 
+    icon: Calendar
   },
-  { 
-    title: "Smart AI Dashboard", 
+  {
+    title: "Smart AI Dashboard",
     description: "Track every call, conversion, and insight with real-time analytics",
-    icon: BarChart3 
+    icon: BarChart3
   },
 ];
 
@@ -104,27 +105,22 @@ export default function LandingPage() {
     setIsLoading(true);
     try {
       const fullNumber = `${countryCode}${phoneNumber.replace(/\D/g, "")}`;
-      const response = await fetch("/api/demo/call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: fullNumber }),
+
+      await apiClientV1.post("/demo/call", {
+        phone_number: fullNumber
       });
 
-      const data = await response.json();
+      toast({
+        title: "Demo Call Initiated!",
+        description: "You'll receive a call from our AI agent shortly.",
+      });
+      setPhoneNumber("");
 
-      if (response.ok) {
-        toast({
-          title: "Demo Call Initiated!",
-          description: "You'll receive a call from our AI agent shortly.",
-        });
-        setPhoneNumber("");
-      } else {
-        throw new Error(data.error || "Failed to initiate call");
-      }
     } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.message || "Something went wrong. Please try again.";
       toast({
         title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -141,30 +137,30 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img 
-              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
-              alt="Cluster X" 
+            <img
+              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png"
+              alt="Cluster X"
               className="h-[52px] w-auto"
             />
           </div>
           <div className="flex items-center gap-2 md:gap-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="text-gray-600 hover:text-gray-900 hidden sm:flex"
               onClick={() => window.open(CALENDLY_URL, "_blank")}
               data-testid="nav-book-demo-btn"
             >
               Book A Demo
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="text-gray-600 hover:text-gray-900"
               onClick={() => setLocation("/login")}
               data-testid="nav-login-btn"
             >
               Login
             </Button>
-            <Button 
+            <Button
               className="bg-primary hover:bg-primary/90 text-white rounded-full px-6"
               onClick={() => setLocation("/login")}
               data-testid="nav-get-started-btn"
@@ -196,12 +192,12 @@ export default function LandingPage() {
             <span className="relative">
               <span className="text-primary"> Scale </span>
               <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                <path d="M2 8C50 2 150 2 198 8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-primary/30"/>
+                <path d="M2 8C50 2 150 2 198 8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-primary/30" />
               </svg>
             </span>
             <br />Your Business
           </h1>
-          
+
           <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
             Experience the power of AI voice agents. Enter your phone number to receive a demo call from our intelligent assistant.
           </p>
@@ -211,8 +207,8 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 p-3 bg-white rounded-2xl border-2 border-gray-100 shadow-xl shadow-gray-100/50">
               <div className="flex gap-2 flex-1">
                 <Select value={countryCode} onValueChange={setCountryCode}>
-                  <SelectTrigger 
-                    className="w-[110px] bg-gray-50 border-0 focus:ring-2 focus:ring-primary/20 rounded-xl" 
+                  <SelectTrigger
+                    className="w-[110px] bg-gray-50 border-0 focus:ring-2 focus:ring-primary/20 rounded-xl"
                     data-testid="country-code-select"
                   >
                     <SelectValue />
@@ -237,7 +233,7 @@ export default function LandingPage() {
                   data-testid="phone-number-input"
                 />
               </div>
-              <Button 
+              <Button
                 onClick={handleDemoCall}
                 disabled={isLoading}
                 className="bg-primary hover:bg-primary/90 text-white px-8 rounded-xl h-12 text-base font-medium shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
@@ -277,8 +273,8 @@ export default function LandingPage() {
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-8 md:p-12 shadow-2xl">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4">
               {STATS.map((stat, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className={`text-center ${index !== STATS.length - 1 ? 'md:border-r md:border-gray-700' : ''}`}
                   data-testid={`stat-${index}`}
                 >
@@ -310,7 +306,7 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {INDUSTRIES.map((industry, index) => (
-              <div 
+              <div
                 key={index}
                 className="group p-6 bg-white rounded-2xl border border-gray-100 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 cursor-pointer hover:-translate-y-1"
                 data-testid={`industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
@@ -342,15 +338,15 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-2 gap-8">
             {FEATURES.map((feature, index) => (
-              <div 
+              <div
                 key={index}
                 className="group bg-white rounded-3xl border border-gray-100 hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 overflow-hidden"
                 data-testid={`feature-${index}`}
               >
                 {feature.image && (
                   <div className="w-full h-56 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-50 relative">
-                    <img 
-                      src={feature.image} 
+                    <img
+                      src={feature.image}
                       alt={feature.title}
                       className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                     />
@@ -386,11 +382,11 @@ export default function LandingPage() {
               Everything you need to scale your voice operations
             </p>
           </div>
-          
+
           <div className="bg-white rounded-[2rem] border-2 border-gray-100 p-8 md:p-12 shadow-2xl shadow-gray-100/50 relative overflow-hidden">
             {/* Background decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-            
+
             <div className="relative z-10">
               <div className="text-center mb-10">
                 <div className="inline-flex items-baseline gap-1 mb-2">
@@ -399,7 +395,7 @@ export default function LandingPage() {
                   <span className="text-xl text-gray-500">/month</span>
                 </div>
                 <p className="text-gray-600">Platform subscription</p>
-                
+
                 <div className="mt-6 pt-6 border-t border-gray-100 inline-block">
                   <div className="inline-flex items-baseline gap-1 bg-primary/5 px-6 py-3 rounded-2xl">
                     <span className="text-lg text-gray-500">+</span>
@@ -409,7 +405,7 @@ export default function LandingPage() {
                   <p className="text-gray-600 mt-2">Voice agent cost per connected call</p>
                 </div>
               </div>
-              
+
               <div className="grid md:grid-cols-2 gap-4 mb-10">
                 {PRICING_FEATURES.map((feature, index) => (
                   <div key={index} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
@@ -420,9 +416,9 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              
+
               <div className="text-center">
-                <Button 
+                <Button
                   size="lg"
                   className="bg-primary hover:bg-primary/90 text-white px-12 rounded-full h-14 text-lg font-medium shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300"
                   onClick={() => setLocation("/login")}
@@ -447,7 +443,7 @@ export default function LandingPage() {
               <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
               <div className="absolute bottom-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
             </div>
-            
+
             <div className="relative z-10">
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
                 Ready to Transform Your<br />Voice Operations?
@@ -456,7 +452,7 @@ export default function LandingPage() {
                 Join hundreds of businesses using Cluster X to automate and scale their customer conversations.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button 
+                <Button
                   size="lg"
                   className="bg-white text-primary hover:bg-gray-100 px-8 rounded-full h-14 text-lg font-medium shadow-xl"
                   onClick={() => window.open(CALENDLY_URL, "_blank")}
@@ -465,7 +461,7 @@ export default function LandingPage() {
                   <Calendar className="w-5 h-5 mr-2" />
                   Book A Demo
                 </Button>
-                <Button 
+                <Button
                   size="lg"
                   variant="outline"
                   className="border-2 border-white/30 text-white hover:bg-white/10 px-8 rounded-full h-14 text-lg font-medium"
@@ -485,9 +481,9 @@ export default function LandingPage() {
       <footer className="py-8 px-6 border-t border-gray-100 bg-gray-50">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img 
-              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
-              alt="Cluster X" 
+            <img
+              src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png"
+              alt="Cluster X"
               className="h-[38px] w-auto"
             />
             <span className="text-gray-500">© 2025 Cluster X. All rights reserved.</span>
