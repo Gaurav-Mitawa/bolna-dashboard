@@ -27,6 +27,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   refetchUser: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,12 +90,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     fetchUser();
   }, []);
 
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setUser(null);
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     isLoading,
     error,
     refetchUser: fetchUser,
+    logout,
   };
 
   return (

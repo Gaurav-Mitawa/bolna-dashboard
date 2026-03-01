@@ -88,6 +88,11 @@ export async function syncBolnaToCrm(user: IUser) {
                                 updateData.status = "booked";
                             }
 
+                            // Preserve existing name if Bolna couldn't extract a real one
+                            if (name === "Bolna Lead" && existing.name && existing.name !== "Bolna Lead") {
+                                delete updateData.name;
+                            }
+
                             // Check if this conversation is already added
                             const alreadyAdded = existing.pastConversations?.some(
                                 (c: any) => c.date.getTime() === conversationEntry.date.getTime()

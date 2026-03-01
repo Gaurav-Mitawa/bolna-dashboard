@@ -209,7 +209,15 @@ export async function processNewCalls(userId: string, apiKey: string) {
                 if (status !== "fresh") {
                     updateOps.$set.tag = status;
                 }
-                if (analysis.contact_name) {
+                // For Contacts
+                // We only want to set the name if the LLM actually found a real name.
+                // If the LLM returned a placeholder or 'Bolna Lead', we skip setting it 
+                // on the contact if it's not a real improvement.
+                let shouldUpdateContactName = !!analysis.contact_name;
+                if (analysis.contact_name && analysis.contact_name.toLowerCase().includes('bolna lead')) {
+                    shouldUpdateContactName = false;
+                }
+                if (shouldUpdateContactName) {
                     updateOps.$set.name = analysis.contact_name;
                 }
 
@@ -240,6 +248,12 @@ export async function processNewCalls(userId: string, apiKey: string) {
 
                 // ALSO UPDATE THE CUSTOMER COLLECTION
                 try {
+                    // First, fetch existing customer to avoid overwriting a good name with a bad LLM guess
+                    const existingCustomer = await Customer.findOne({
+                        userId,
+                        phoneNumber: normalizedContactPhone
+                    });
+
                     const customerUpdateOps: any = {
                         $set: {
                             updatedAt: new Date()
@@ -249,7 +263,30 @@ export async function processNewCalls(userId: string, apiKey: string) {
                     if (status !== "fresh") {
                         customerUpdateOps.$set.status = status;
                     }
+
+                    // Smart name update logic for Customer
+                    let shouldUpdateCustomerName = false;
                     if (analysis.contact_name) {
+                        const isLlmNamePlaceholder = analysis.contact_name.toLowerCase().includes('bolna lead');
+                        if (!existingCustomer) {
+                            shouldUpdateCustomerName = true;
+                        } else {
+                            const existingName = existingCustomer.name;
+                            const hasValidExistingName = existingName && !existingName.toLowerCase().includes('bolna lead');
+
+                            if (hasValidExistingName) {
+                                // Only overwrite a good existing name if the LLM returned a good name
+                                if (!isLlmNamePlaceholder) {
+                                    shouldUpdateCustomerName = true;
+                                }
+                            } else {
+                                // Existing name is bad or missing, so update it (even to another placeholder if needed, though usually better real name)
+                                shouldUpdateCustomerName = true;
+                            }
+                        }
+                    }
+
+                    if (shouldUpdateCustomerName) {
                         customerUpdateOps.$set.name = analysis.contact_name;
                     }
 

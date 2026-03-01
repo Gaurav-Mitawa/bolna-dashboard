@@ -19,6 +19,7 @@ import {
   CalendarCheck,
   Menu,
   CreditCard,
+  LogOut,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
@@ -76,7 +77,7 @@ function NavItem({
 
 export default function AppShell({ children }: AppShellProps) {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [aiAgentsExpanded, setAiAgentsExpanded] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -185,13 +186,21 @@ export default function AppShell({ children }: AppShellProps) {
               <p className="text-xs text-gray-400 truncate">{user.email}</p>
             </div>
           </div>
-          <div className="mt-3 px-2">
+          <div className="mt-3 px-2 flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-400">Subscription</span>
               <span className={`font-medium ${user.isSubscriptionActive ? 'text-green-400' : 'text-red-400'}`}>
                 {user.subscriptionStatus === 'active' ? 'Active' : user.subscriptionStatus === 'expired' ? 'Expired' : 'Inactive'}
               </span>
             </div>
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-gray-400 hover:text-white hover:bg-gray-800 h-8 px-2"
+              onClick={() => logout()}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              <span className="text-xs">Log out</span>
+            </Button>
           </div>
         </div>
       )}

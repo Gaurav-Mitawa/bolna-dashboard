@@ -60,6 +60,7 @@ export function CreateCampaignModal({
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [campaignName, setCampaignName] = useState("");
 
@@ -83,6 +84,7 @@ export function CreateCampaignModal({
       setSelectedPhoneNumber("");
       setCampaignName("");
       setPreviewCount(null);
+      setSubmitError(null);
     }
   }, [open]);
 
@@ -165,6 +167,7 @@ export function CreateCampaignModal({
     }
 
     setIsCreating(true);
+    setSubmitError(null);
     try {
       const res = await fetch("/api/campaigns/create", {
         method: "POST",
@@ -187,7 +190,9 @@ export function CreateCampaignModal({
       onOpenChange(false);
       onCreated?.();
     } catch (err: any) {
-      toast.error(err.message || "Failed to create campaign");
+      const errorMsg = err.message || "Failed to create campaign";
+      setSubmitError(errorMsg);
+      toast.error("Failed to create campaign");
     } finally {
       setIsCreating(false);
     }
@@ -421,6 +426,18 @@ export function CreateCampaignModal({
                 <span className="font-medium">{selectedPhoneNumber}</span>
               </div>
             </div>
+
+            {submitError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-red-800 mb-1">Campaign Creation Failed</p>
+                <p className="text-sm text-red-700">{submitError}</p>
+                {submitError.toLowerCase().includes("trial account") && (
+                  <p className="text-sm text-red-700 mt-2 font-medium">
+                    Note: Bolna trial accounts restrict outbound calls. You can only call the specific verified phone numbers listed in your Bolna dashboard. Provide a list of customers with those exact phone numbers, or upgrade your Bolna account.
+                  </p>
+                )}
+              </div>
+            )}
 
             <p className="text-xs text-gray-500">
               The backend will build a CSV from your CRM customers with status{" "}
