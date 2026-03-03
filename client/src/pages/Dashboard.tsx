@@ -208,7 +208,8 @@ export default function Dashboard() {
 
   // Subscription/Trial banner
   const sub = summary?.subscription;
-  const showSubBanner = sub && (!sub.isTrial && (sub.status !== "active" || sub.daysLeft <= 7)) || (sub?.isTrial);
+  // Always show banner for trial, expired, or active so user knows their status
+  const showSubBanner = !!sub;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -219,13 +220,17 @@ export default function Dashboard() {
             "rounded-xl p-4 border flex items-center gap-3",
             sub.isTrial
               ? "bg-blue-50 border-blue-200"
-              : sub.status === "active" && sub.daysLeft <= 7
-                ? "bg-yellow-50 border-yellow-200"
-                : "bg-red-50 border-red-200"
+              : sub.status === "active" && sub.daysLeft > 7
+                ? "bg-green-50 border-green-200"
+                : sub.status === "active" && sub.daysLeft <= 7
+                  ? "bg-yellow-50 border-yellow-200"
+                  : "bg-red-50 border-red-200"
           )}
         >
           {sub.isTrial ? (
             <Clock className="h-5 w-5 text-blue-600 flex-shrink-0" />
+          ) : sub.status === "active" && sub.daysLeft > 7 ? (
+            <Clock className="h-5 w-5 text-green-600 flex-shrink-0" />
           ) : sub.status === "active" ? (
             <Clock className="h-5 w-5 text-yellow-600 flex-shrink-0" />
           ) : (
@@ -235,6 +240,10 @@ export default function Dashboard() {
             {sub.isTrial ? (
               <p className="text-sm font-medium text-blue-800">
                 You are on a <strong>7-day free trial</strong>. You have <strong>{sub.daysLeft} days</strong> remaining.
+              </p>
+            ) : sub.status === "active" && sub.daysLeft > 7 ? (
+              <p className="text-sm font-medium text-green-800">
+                You are on the <strong>Paid Plan</strong>. Subscription expires in <strong>{sub.daysLeft} days</strong>.
               </p>
             ) : sub.status === "active" ? (
               <p className="text-sm font-medium text-yellow-800">
@@ -248,17 +257,19 @@ export default function Dashboard() {
               </p>
             )}
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className={cn(
-              "flex-shrink-0",
-              sub.isTrial ? "border-blue-200 hover:bg-blue-100" : ""
-            )}
-            onClick={() => (window.location.href = "/subscribe")}
-          >
-            {sub.isTrial ? "Upgrade Now" : sub.status === "active" ? "Renew" : "Subscribe"}
-          </Button>
+          {(!sub.isTrial && sub.status === "active" && sub.daysLeft > 7) ? null : (
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn(
+                "flex-shrink-0",
+                sub.isTrial ? "border-blue-200 hover:bg-blue-100" : ""
+              )}
+              onClick={() => (window.location.href = "/subscribe")}
+            >
+              {sub.isTrial ? "Upgrade Now" : sub.status === "active" ? "Renew" : "Subscribe"}
+            </Button>
+          )}
         </div>
       )}
 

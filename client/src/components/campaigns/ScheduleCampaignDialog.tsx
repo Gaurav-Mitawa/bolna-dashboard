@@ -21,6 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface ScheduleCampaignDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ export function ScheduleCampaignDialog({
   campaignName,
   isLoading = false,
 }: ScheduleCampaignDialogProps) {
+  const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState<string>("");
 
@@ -56,9 +58,13 @@ export function ScheduleCampaignDialog({
     scheduledDateTime.setHours(hours, minutes, 0, 0);
 
     // Bolna requires scheduled time to be at least 2 minutes in the future
-    const minTime = new Date(Date.now() + 3 * 60 * 1000); // 3 min buffer
+    const minTime = new Date(Date.now() + 2 * 60 * 1000); // 2 min buffer
     if (scheduledDateTime < minTime) {
-      alert("Scheduled time must be at least 3 minutes in the future.");
+      toast({
+        title: "Invalid Time",
+        description: "Scheduled time must be at least 2 minutes in the future.",
+        variant: "destructive",
+      });
       return;
     }
 

@@ -54,6 +54,10 @@ router.get("/health", (_req: Request, res: Response) => {
 // GET /api/auth/me — Return current session user
 router.get("/me", (req: Request, res: Response) => {
   try {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+
     if (!req.isAuthenticated || !req.isAuthenticated()) {
       return res.status(200).json({ authenticated: false, error: "Not authenticated" });
     }

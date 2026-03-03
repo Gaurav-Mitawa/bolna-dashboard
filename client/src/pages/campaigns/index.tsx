@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Megaphone, RefreshCw, PlusCircle, Loader2, Play, Square, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { Megaphone, RefreshCw, PlusCircle, Loader2, Play, Square, ChevronLeft, ChevronRight, AlertTriangle, Trash2 } from "lucide-react";
 import { CreateCampaignModal } from "@/components/campaigns/CreateCampaignModal";
 import { ScheduleCampaignDialog } from "@/components/campaigns/ScheduleCampaignDialog";
 import { toast } from "sonner";
@@ -68,6 +68,7 @@ export default function CampaignsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [scheduleDialogData, setScheduleDialogData] = useState<{ id: string; name: string } | null>(null);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const {
     data,
@@ -140,6 +141,30 @@ export default function CampaignsPage() {
       refetch();
     } finally {
       setStoppingId(null);
+    }
+  };
+
+  const handleDeleteCampaign = async (campaignId: string, campaignName: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${campaignName}"?\n\nThis action is permanent and cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(campaignId);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to delete" }));
+        throw new Error(err.error || "Failed to delete campaign");
+      }
+      toast.success("Campaign deleted successfully");
+      refetch();
+    } catch (err: any) {
+      toast.error(err.message || "Network error while deleting campaign");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -344,6 +369,23 @@ export default function CampaignsPage() {
                                 </span>
                               </div>
                             )}
+
+                            {/* Delete button (available for all statuses) */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 gap-1.5 h-8 w-8 px-0 flex items-center justify-center transition-all"
+                              onClick={() => handleDeleteCampaign(campaign._id, campaign.name)}
+                              disabled={deletingId === campaign._id}
+                              title="Delete Campaign"
+                            >
+                              {deletingId === campaign._id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                              <span className="sr-only">Delete</span>
+                            </Button>
                           </div>
                         </td>
                       </tr>

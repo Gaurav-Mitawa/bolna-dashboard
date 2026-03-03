@@ -393,4 +393,29 @@ router.get(
   }
 );
 
+// DELETE /api/campaigns/:id — Delete a campaign
+router.delete(
+  "/:id",
+  isAuthenticated,
+  isSubscribed,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user as any;
+      const campaign = await Campaign.findOneAndDelete({
+        _id: req.params.id,
+        userId: user._id,
+      });
+
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      res.status(200).json({ success: true, message: "Campaign deleted successfully" });
+    } catch (err: any) {
+      console.error("Campaign delete error:", err);
+      res.status(500).json({ error: `Backend Crash: ${err.stack || err.message}` });
+    }
+  }
+);
+
 export default router;

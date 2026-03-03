@@ -165,10 +165,15 @@ export async function activateSubscription(
   );
 
   await User.findByIdAndUpdate(userId, {
-    subscriptionStatus: "active",
-    subscriptionExpiresAt: periodEnd,
-    currentPeriodStart: periodStart,
-    trialExpiresAt: null, // clear trial — user is now a paid subscriber
+    $set: {
+      subscriptionStatus: "active",
+      subscriptionExpiresAt: periodEnd,
+      currentPeriodStart: periodStart,
+    },
+    $unset: {
+      trialExpiresAt: 1,
+      trialStartedAt: 1,
+    }
   });
 
   console.log(`[Subscription] Activated for user ${userId}, expires ${periodEnd}`);
