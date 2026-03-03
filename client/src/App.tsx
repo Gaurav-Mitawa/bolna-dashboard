@@ -66,7 +66,7 @@ function AppContent() {
   }
 
   // Authenticated + has key but no active subscription → subscribe
-  if (location === "/subscribe" || location === "/subscription") {
+  if (location === "/subscription" || location === "/subscription") {
     if (!user?.isSubscriptionActive) return <SubscribePage />;
   }
   if (!user?.isSubscriptionActive) {

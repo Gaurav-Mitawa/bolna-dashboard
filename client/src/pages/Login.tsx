@@ -34,11 +34,11 @@ export default function LoginPage() {
           <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl"></div>
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-center px-16 text-white">
-          <img 
-            src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
-            alt="Cluster X" 
+          <img
+            src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png"
+            alt="Cluster X"
             className="h-14 w-auto mb-8 brightness-0 invert"
           />
           <h1 className="text-4xl font-bold mb-4">
@@ -47,7 +47,7 @@ export default function LoginPage() {
           <p className="text-xl text-white/80 mb-12">
             Automate calls, qualify leads, and grow your business 24/7
           </p>
-          
+
           {/* Feature highlights */}
           <div className="space-y-6">
             <div className="flex items-center gap-4">
@@ -85,7 +85,7 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
         <div className="w-full max-w-md">
           {/* Back to Home */}
-          <button 
+          <button
             onClick={() => setLocation("/")}
             className="text-sm text-gray-500 hover:text-gray-700 mb-8 flex items-center gap-1"
           >
@@ -95,10 +95,10 @@ export default function LoginPage() {
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             {/* Mobile Logo */}
             <div className="text-center mb-8">
-              <img 
-                src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png" 
-                alt="Cluster X" 
-                className="h-12 w-auto mx-auto mb-4 lg:hidden"
+              <img
+                src="https://customer-assets.emergentagent.com/job_a64826e5-d955-406b-ac0d-1d7f5ea77579/artifacts/0w18fj4n_Transperent.png"
+                alt="Cluster X"
+                className="h-20 w-auto mx-auto mb-4 lg:hidden"
               />
               <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
               <p className="text-gray-500 mt-2">Sign in to your account to continue</p>
@@ -143,7 +143,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Don't have an account?{" "}
-            <button 
+            <button
               onClick={() => { window.location.href = "/api/auth/google"; }}
               className="text-primary font-medium hover:underline"
             >
