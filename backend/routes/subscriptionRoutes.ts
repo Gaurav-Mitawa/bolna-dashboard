@@ -3,6 +3,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import { User } from "../models/User.js";
 import { Payment } from "../models/Payment.js";
+import { Coupon } from "../models/Coupon.js";
 
 import { calculateNewExpiry } from "../utils/subscriptionHelper.js";
 import { isAuthenticated } from "../middleware/auth.js";
@@ -56,7 +57,7 @@ router.post(
       });
 
       await Payment.create({
-        userId: user._id,
+        userId: req.tenantId,
         razorpayOrderId: order.id,
         amountPaid: amount,
         status: "pending",
@@ -105,36 +106,72 @@ router.post("/verify-payment", isAuthenticated, async (req: Request, res: Respon
   }
 });
 
-// POST /api/subscribe/start-trial — 7-day free trial for new users
+// POST /api/subscribe/start-trial — Free trial for new users (7 or 30 days with coupon)
 router.post("/start-trial", isAuthenticated, async (req: Request, res: Response) => {
   try {
-    const user = req.user as any;
-    if (!user) return res.status(401).json({ error: "Not authenticated" });
+    const userId = (req.user as any)._id;
+    const { couponCode } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     // Must have API key configured first
     if (!user.bolnaApiKey) {
-      return res.status(400).json({ error: "Please set up your API key first." });
+      return res.status(400).json({ message: "Please set up your API key first." });
     }
 
-    // Must not have already started a trial
-    if (user.trialStartedAt) {
-      return res.status(400).json({ error: "You have already used your free trial." });
+    // Determine trial duration
+    let trialDays = PLANS.trial.durationDays; // Default: 7 days
+    let appliedCoupon: string | null = null;
+
+    // Validate and apply coupon if provided
+    if (couponCode && couponCode.trim()) {
+      const coupon = await Coupon.findOne({
+        code: couponCode.toUpperCase().trim(),
+        isActive: true,
+      });
+
+      if (!coupon) {
+        return res.status(400).json({
+          message: "Invalid or expired coupon code",
+          field: "couponCode",
+        });
+      }
+
+      trialDays = coupon.trialDays;
+      appliedCoupon = coupon.code;
     }
 
+    // Calculate trial end date
     const now = new Date();
-    const trialExpiresAt = new Date(now.getTime() + PLANS.trial.durationDays * 24 * 60 * 60 * 1000);
+    const trialEnd = new Date(now);
+    trialEnd.setDate(trialEnd.getDate() + trialDays);
 
-    await User.findByIdAndUpdate(user._id, {
-      trialStartedAt: now,
-      trialExpiresAt,
-      subscriptionStatus: "trial",
+    // Update user with trial info
+    user.subscriptionStatus = "trial";
+    user.trialStartedAt = now;
+    user.trialExpiresAt = trialEnd; // Keep for backward compatibility
+    user.trialEndDate = trialEnd; // Primary field
+    user.couponApplied = appliedCoupon;
+
+    await user.save();
+
+    console.log(
+      `[Subscription] ${trialDays}-day trial started for user: ${userId}${
+        appliedCoupon ? ` with coupon: ${appliedCoupon}` : ""
+      }. Expires: ${trialEnd}`
+    );
+
+    res.json({
+      message: `Trial started successfully (${trialDays} days)`,
+      trialExpiresAt: trialEnd,
+      couponApplied: appliedCoupon !== null,
     });
-
-    console.log(`[Subscription] 7-day trial started for user: ${user._id}. Expires: ${trialExpiresAt}`);
-    res.json({ success: true, redirect: "/dashboard" });
   } catch (err: any) {
     console.error("[Subscription] Start-trial error:", err.stack || err.message || err);
-    res.status(500).json({ error: "Failed to start trial" });
+    res.status(500).json({ message: "Failed to start trial" });
   }
 });
 
@@ -146,7 +183,8 @@ export async function activateSubscription(
   orderId: string,
   paymentId: string
 ): Promise<void> {
-  const payment = await Payment.findOne({ razorpayOrderId: orderId });
+  // Include userId in Payment queries for tenant isolation
+  const payment = await Payment.findOne({ razorpayOrderId: orderId, userId });
   if (!payment || payment.status === "success") return; // already processed
 
   const user = await User.findById(userId);
@@ -155,7 +193,7 @@ export async function activateSubscription(
   const { periodStart, periodEnd } = calculateNewExpiry(user.subscriptionExpiresAt);
 
   await Payment.findOneAndUpdate(
-    { razorpayOrderId: orderId },
+    { razorpayOrderId: orderId, userId },
     {
       razorpayPaymentId: paymentId,
       status: "success",

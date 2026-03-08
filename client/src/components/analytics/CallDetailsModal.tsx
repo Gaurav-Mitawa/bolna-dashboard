@@ -134,6 +134,7 @@ function formatDate(dateString: string): string {
 
 export function CallDetailsModal({ isOpen, onClose, call }: CallDetailsModalProps) {
   const [isCopying, setIsCopying] = useState(false);
+  const [showHindi, setShowHindi] = useState(false);
 
   if (!call) {
     return null;
@@ -222,9 +223,70 @@ export function CallDetailsModal({ isOpen, onClose, call }: CallDetailsModalProp
                   <FileText className="w-4 h-4" />
                   Summary
                 </h3>
+                <div className="flex items-center gap-2 mb-3">
+                  <button
+                    onClick={() => setShowHindi(false)}
+                    className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                      !showHindi
+                        ? "bg-slate-800 text-white border-slate-800"
+                        : "bg-white text-slate-600 border-slate-300 hover:border-slate-400"
+                    }`}
+                  >
+                    EN
+                  </button>
+                  {call.summary_hi && (
+                    <button
+                      onClick={() => setShowHindi(true)}
+                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                        showHindi
+                          ? "bg-slate-800 text-white border-slate-800"
+                          : "bg-white text-slate-600 border-slate-300 hover:border-slate-400"
+                      }`}
+                    >
+                      HI
+                    </button>
+                  )}
+                </div>
                 <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-4">
-                  {call.summary}
+                  {showHindi && call.summary_hi ? call.summary_hi : call.summary_en || call.summary}
                 </p>
+                <div className="mt-3 space-y-2">
+                  {call.intent && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-medium">Intent:</span>
+                      <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300">
+                        {call.intent.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                  )}
+                  {call.next_step && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">
+                        Next Step
+                      </p>
+                      <p className="text-sm text-blue-900">
+                        {call.next_step}
+                      </p>
+                    </div>
+                  )}
+                  {call.sentiment && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-medium">Sentiment:</span>
+                      <Badge
+                        variant="outline"
+                        className={
+                          call.sentiment === "positive"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : call.sentiment === "negative"
+                            ? "bg-red-50 text-red-700 border-red-200"
+                            : "bg-slate-100 text-slate-600 border-slate-200"
+                        }
+                      >
+                        {call.sentiment}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

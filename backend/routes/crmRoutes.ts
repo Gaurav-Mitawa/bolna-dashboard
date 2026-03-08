@@ -50,7 +50,7 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     const skip = (page - 1) * limit;
 
     const user = req.user as any;
-    const filter: any = { userId: user._id };
+    const filter: any = { userId: req.tenantId };
 
     const allowedStatuses = ["fresh", "interested", "not_interested", "booked", "NA", "queries"];
     if (req.query.status && allowedStatuses.includes(req.query.status as string)) {
@@ -92,7 +92,7 @@ router.get("/stats", isAuthenticated, isSubscribed, async (req: Request, res: Re
   try {
     const user = req.user as any;
     const stats = await Customer.aggregate([
-      { $match: { userId: user._id, isDeleted: false } },
+      { $match: { userId: req.tenantId, isDeleted: false } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
 
@@ -138,7 +138,7 @@ router.post(
 
       const user = req.user as any;
       const customer = await Customer.create({
-        userId: user._id,
+        userId: req.tenantId,
         name: name.trim(),
         phoneNumber: phoneNumber.trim(),
         email: (email || "").trim(),
@@ -202,7 +202,7 @@ router.post(
         }
 
         processed.push({
-          userId: user._id,
+          userId: req.tenantId,
           name: row.name.trim(),
           phoneNumber: phone,
           email: (row.email || "").trim(),
@@ -279,7 +279,7 @@ router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Resp
     }
 
     const customer = await Customer.findOneAndUpdate(
-      { _id: req.params.id, userId: user._id },
+      { _id: req.params.id, userId: req.tenantId },
       update,
       { new: true, runValidators: true }
     );
@@ -299,7 +299,7 @@ router.delete("/:id", isAuthenticated, isSubscribed, async (req: Request, res: R
   try {
     const user = req.user as any;
     const deleted = await Customer.findOneAndDelete(
-      { _id: req.params.id, userId: user._id }
+      { _id: req.params.id, userId: req.tenantId }
     );
 
     if (!deleted) return res.status(404).json({ message: "Lead not found" });

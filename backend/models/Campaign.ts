@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { CustomerStatus } from "./Customer.js";
+import { tenantPlugin } from "../plugins/tenantPlugin.js";
 
 export interface ICampaign extends Document {
   userId: mongoose.Types.ObjectId;
@@ -35,5 +36,12 @@ const campaignSchema = new Schema<ICampaign>(
   },
   { timestamps: true }
 );
+
+// Query performance indexes
+campaignSchema.index({ userId: 1, status: 1 });
+campaignSchema.index({ userId: 1, createdAt: -1 });
+
+// Apply tenant isolation plugin
+campaignSchema.plugin(tenantPlugin);
 
 export const Campaign = mongoose.model<ICampaign>("Campaign", campaignSchema);

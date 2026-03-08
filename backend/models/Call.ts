@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { tenantPlugin } from "../plugins/tenantPlugin.js";
 
 export interface ICall extends Document {
     call_id: string;
@@ -22,8 +23,12 @@ export interface ICall extends Document {
     extracted_data: Record<string, any> | null;
     llm_analysis: {
         summary: string;
+        summary_en: string;
+        summary_hi: string;
         intent: string;
-        contact_name: string | null;
+        next_step: string;
+        sentiment: string;
+        customer_name: string | null;
         booking: {
             is_booked: boolean;
             date: string | null;
@@ -33,11 +38,12 @@ export interface ICall extends Document {
     } | null;
     processed: boolean;
     raw_llm_output: string | null;
+    status: string | null;
     created_at: Date;
 }
 
 const CallSchema = new Schema<ICall>({
-    call_id: { type: String, required: true, index: true },
+    call_id: { type: String, required: true },
     userId: { type: String, required: true, index: true },
     agent_id: { type: String, required: true },
     caller_number: { type: String, default: "" },
@@ -56,7 +62,18 @@ const CallSchema = new Schema<ICall>({
     },
     processed: { type: Boolean, default: false },
     raw_llm_output: { type: String, default: null },
+    status: { type: String, default: null, index: true },
     created_at: { type: Date, default: Date.now },
 });
+
+// Compound index: call_id uniqueness is per-user
+CallSchema.index({ userId: 1, call_id: 1 }, { unique: true });
+// Query performance indexes
+CallSchema.index({ userId: 1, created_at: -1 });
+CallSchema.index({ userId: 1, processed: 1 });
+CallSchema.index({ userId: 1, caller_number: 1 });
+
+// Apply tenant isolation plugin
+CallSchema.plugin(tenantPlugin);
 
 export const Call = mongoose.model<ICall>("Call", CallSchema);

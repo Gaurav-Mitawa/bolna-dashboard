@@ -1,19 +1,24 @@
 /**
  * All call-processor API routes in one file.
+ * FIXED: All queries now include userId filter for tenant isolation.
  */
 import { Router, Request, Response } from "express";
 import { processNewCalls } from "../services/callProcessor.js";
 import { Call } from "../models/Call.js";
+import { isAuthenticated, isSubscribed, hasBolnaKey } from "../middleware/auth.js";
+import { getApiKey } from "../services/bolnaService.js";
 
 const router = Router();
 
 /**
  * POST /api/internal/process-calls
- * Manually trigger the polling + LLM + save pipeline.
+ * Manually trigger the polling + LLM + save pipeline for the authenticated user.
  */
-router.post("/internal/process-calls", async (_req: Request, res: Response) => {
+router.post("/internal/process-calls", isAuthenticated, isSubscribed, hasBolnaKey, async (req: Request, res: Response) => {
     try {
-        const result = await processNewCalls();
+        const userId = req.tenantId;
+        const apiKey = getApiKey(req.user as any);
+        const result = await processNewCalls(userId, apiKey);
         res.json({ success: true, ...result });
     } catch (err: any) {
         console.error("[Route] process-calls error:", err);
@@ -26,13 +31,12 @@ router.post("/internal/process-calls", async (_req: Request, res: Response) => {
  * Returns calls where LLM detected a booking (is_booked = true) OR intent is "interested".
  * Query params: direction (inbound/outbound)
  */
-router.get("/call-bookings", async (req: Request, res: Response) => {
+router.get("/call-bookings", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
     try {
+        const userId = req.tenantId;
         const query: any = {
-            $or: [
-                { "llm_analysis.booking.is_booked": true },
-                { "llm_analysis.intent": "interested" }
-            ]
+            userId,
+            status: "booked"
         };
 
         if (req.query.direction) {
@@ -40,7 +44,7 @@ router.get("/call-bookings", async (req: Request, res: Response) => {
         }
 
         const bookings = await Call.find(query)
-            .sort({ call_timestamp: -1 })
+            .sort({ created_at: -1 })
             .lean();
         res.json(bookings);
     } catch (err: any) {
@@ -50,12 +54,14 @@ router.get("/call-bookings", async (req: Request, res: Response) => {
 
 /**
  * GET /api/queries-calls
- * Returns ALL LLM-processed calls (all intents).
+ * Returns ALL LLM-processed calls (all intents) for the authenticated user.
  * Query params: direction (inbound/outbound)
  */
-router.get("/queries-calls", async (req: Request, res: Response) => {
+router.get("/queries-calls", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
     try {
+        const userId = req.tenantId;
         const query: any = {
+            userId,
             processed: true,
             llm_analysis: { $ne: null },
         };
@@ -65,7 +71,7 @@ router.get("/queries-calls", async (req: Request, res: Response) => {
         }
 
         const calls = await Call.find(query)
-            .sort({ call_timestamp: -1 })
+            .sort({ created_at: -1 })
             .lean();
         res.json(calls);
     } catch (err: any) {
@@ -75,11 +81,12 @@ router.get("/queries-calls", async (req: Request, res: Response) => {
 
 /**
  * GET /api/call-bookings/:call_id
- * Single booking detail.
+ * Single booking detail — scoped to current user.
  */
-router.get("/call-bookings/:call_id", async (req: Request, res: Response) => {
+router.get("/call-bookings/:call_id", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
     try {
-        const doc = await Call.findOne({ call_id: req.params.call_id }).lean();
+        const userId = req.tenantId;
+        const doc = await Call.findOne({ call_id: req.params.call_id, userId }).lean();
         if (!doc) return res.status(404).json({ error: "Not found" });
         res.json(doc);
     } catch (err: any) {
@@ -89,12 +96,13 @@ router.get("/call-bookings/:call_id", async (req: Request, res: Response) => {
 
 /**
  * GET /api/processed-calls
- * All processed calls with summary + intent.
+ * All processed calls with summary + intent — scoped to current user.
  * Query params: direction (inbound/outbound), intent (any intent type)
  */
-router.get("/processed-calls", async (req: Request, res: Response) => {
+router.get("/processed-calls", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
     try {
-        const query: any = { processed: true };
+        const userId = req.tenantId;
+        const query: any = { userId, processed: true };
 
         if (req.query.direction) {
             query.call_direction = req.query.direction;
@@ -105,7 +113,7 @@ router.get("/processed-calls", async (req: Request, res: Response) => {
         }
 
         const calls = await Call.find(query)
-            .sort({ call_timestamp: -1 })
+            .sort({ created_at: -1 })
             .lean();
         res.json(calls);
     } catch (err: any) {
@@ -115,11 +123,12 @@ router.get("/processed-calls", async (req: Request, res: Response) => {
 
 /**
  * GET /api/processed-calls/:call_id
- * Single call detail.
+ * Single call detail — scoped to current user.
  */
-router.get("/processed-calls/:call_id", async (req: Request, res: Response) => {
+router.get("/processed-calls/:call_id", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
     try {
-        const doc = await Call.findOne({ call_id: req.params.call_id }).lean();
+        const userId = req.tenantId;
+        const doc = await Call.findOne({ call_id: req.params.call_id, userId }).lean();
         if (!doc) return res.status(404).json({ error: "Not found" });
         res.json(doc);
     } catch (err: any) {
@@ -129,11 +138,12 @@ router.get("/processed-calls/:call_id", async (req: Request, res: Response) => {
 
 /**
  * GET /api/internal/call-status/:call_id
- * Check processing status of a specific call.
+ * Check processing status of a specific call — scoped to current user.
  */
-router.get("/internal/call-status/:call_id", async (req: Request, res: Response) => {
+router.get("/internal/call-status/:call_id", isAuthenticated, async (req: Request, res: Response) => {
     try {
-        const doc = await Call.findOne({ call_id: req.params.call_id }).lean();
+        const userId = req.tenantId;
+        const doc = await Call.findOne({ call_id: req.params.call_id, userId }).lean();
         if (!doc) return res.status(404).json({ exists: false });
         res.json({
             exists: true,

@@ -3,6 +3,7 @@
  * Fetches completed executions from Bolna, returns only unprocessed ones.
  */
 import { Call } from "../models/Call.js";
+import { skipTenantEnforcement } from "../plugins/tenantPlugin.js";
 
 const BOLNA_API = "https://api.bolna.ai";
 
@@ -109,8 +110,20 @@ export async function pollNewCalls(userId: string, apiKey: string): Promise<NewC
 
                 for (const exec of executions) {
                     // Check if already in our DB and processed for THIS user
-                    const exists = await Call.findOne({ call_id: exec.id });
+                    const exists = await Call.findOne({ call_id: exec.id, userId });
                     if (exists && exists.processed) continue;
+
+                    // Cross-tenant collision guard: if this call exists under a DIFFERENT user, skip it
+                    const crossTenantCheck = await skipTenantEnforcement(
+                        Call.findOne({ call_id: exec.id })
+                    );
+                    if (crossTenantCheck && crossTenantCheck.userId !== userId) {
+                        console.warn(
+                            `[Poller] CROSS-TENANT WARNING: Call ${exec.id} already exists under userId=${crossTenantCheck.userId}, ` +
+                            `but current user is ${userId}. Skipping to prevent data contamination.`
+                        );
+                        continue;
+                    }
 
                     // Determine customer number based on direction
                     const direction = exec.telephony_data?.call_type || "inbound";

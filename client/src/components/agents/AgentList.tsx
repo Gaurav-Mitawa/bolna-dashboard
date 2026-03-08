@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Play, Pause, Settings, Mic, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PauseAgentButton } from "./PauseAgentButton";
 
 interface AgentListProps {
   agents: AgentWithStats[];
@@ -152,6 +153,10 @@ export function AgentList({
                         <Play className="h-4 w-4" />
                       )}
                     </Button>
+                    <PauseAgentButton
+                      agentId={agent.id}
+                      agentName={agent.name}
+                    />
                     <Button
                       variant="ghost"
                       size="icon"

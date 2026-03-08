@@ -14,7 +14,7 @@ router.use(isAuthenticated);
 // GET /api/contacts - List all contacts with filters
 router.get("/", async (req: Request, res: Response) => {
     try {
-        const userId = (req.user as any)._id;
+        const userId = req.tenantId;
         const { tag, source, search, limit, skip } = req.query;
         const query: any = { userId }; // Always scope by userId
 
@@ -55,7 +55,7 @@ router.get("/", async (req: Request, res: Response) => {
 // GET /api/contacts/:id/latest-structured-call
 router.get("/:id/latest-structured-call", async (req: Request, res: Response) => {
     try {
-        const userId = (req.user as any)._id;
+        const userId = req.tenantId;
         const contact = await Contact.findOne({ _id: req.params.id, userId }).lean();
         const query = contact ? { caller_number: contact.phone, userId } : { caller_number: req.params.id, userId };
 
@@ -87,7 +87,7 @@ router.get("/:id/latest-structured-call", async (req: Request, res: Response) =>
 // GET /api/contacts/:id - Get single contact + call history
 router.get("/:id", async (req: Request, res: Response) => {
     try {
-        const userId = (req.user as any)._id;
+        const userId = req.tenantId;
         let contact = await Contact.findOne({ _id: req.params.id, userId }).lean();
         if (!contact) {
             const byPhone = await Contact.findOne({ phone: req.params.id, userId }).lean();
@@ -141,6 +141,10 @@ router.get("/:id", async (req: Request, res: Response) => {
             type: call.call_direction,
             intent: call.llm_analysis?.intent,
             summary: call.llm_analysis?.summary || call.transcript,
+            summary_en: call.llm_analysis?.summary_en,
+            summary_hi: call.llm_analysis?.summary_hi,
+            next_step: call.llm_analysis?.next_step,
+            sentiment: call.llm_analysis?.sentiment,
             transcript: call.transcript,
             recording_url: call.recording_url || "",
             agent_name: call.agent_name || call.agent_id,
@@ -162,7 +166,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 // POST /api/contacts - Create contact
 router.post("/", async (req: Request, res: Response) => {
     try {
-        const userId = (req.user as any)._id;
+        const userId = req.tenantId;
         const newContact = new Contact({ ...req.body, userId });
         const saved = await newContact.save();
         res.json({ ...saved.toObject(), id: saved._id.toString() });
@@ -174,7 +178,7 @@ router.post("/", async (req: Request, res: Response) => {
 // PUT /api/contacts/:id - Update contact
 router.put("/:id", async (req: Request, res: Response) => {
     try {
-        const userId = (req.user as any)._id;
+        const userId = req.tenantId;
         const updated = await Contact.findOneAndUpdate(
             { _id: req.params.id, userId },
             { ...req.body, updated_at: new Date() },
@@ -190,7 +194,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 // DELETE /api/contacts/:id - Delete contact
 router.delete("/:id", async (req: Request, res: Response) => {
     try {
-        const userId = (req.user as any)._id;
+        const userId = req.tenantId;
         await Contact.findOneAndDelete({ _id: req.params.id, userId });
         res.json({ success: true });
     } catch (err: any) {

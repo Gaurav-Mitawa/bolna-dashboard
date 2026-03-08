@@ -11,7 +11,7 @@ const router = Router();
 router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
-    const userId = user._id;
+    const userId = req.tenantId;
 
     // CRM stats
     const crmStats = await Customer.aggregate([

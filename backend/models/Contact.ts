@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { tenantPlugin } from "../plugins/tenantPlugin.js";
 
 export interface IContact extends Document {
     name: string;
@@ -20,7 +21,7 @@ const ContactSchema = new Schema<IContact>({
     name: { type: String, required: true },
     userId: { type: String, required: true, index: true },
     email: { type: String, default: "" },
-    phone: { type: String, required: true, index: true },
+    phone: { type: String, required: true },
     tag: { type: String, default: "fresh" },
     source: { type: String, default: "unknown" },
     call_count: { type: Number, default: 0 },
@@ -31,5 +32,14 @@ const ContactSchema = new Schema<IContact>({
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
 });
+
+// Compound index: phone uniqueness is per-user (not global)
+ContactSchema.index({ userId: 1, phone: 1 }, { unique: true });
+// Query performance indexes
+ContactSchema.index({ userId: 1, created_at: -1 });
+ContactSchema.index({ userId: 1, tag: 1 });
+
+// Apply tenant isolation plugin
+ContactSchema.plugin(tenantPlugin);
 
 export const Contact = mongoose.model<IContact>("Contact", ContactSchema);

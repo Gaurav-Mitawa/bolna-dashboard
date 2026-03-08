@@ -66,17 +66,21 @@ export interface PMSPersonalization {
  */
 export interface CallSummary {
   id: string;
-  date: string;                // ISO string preferred for backend, formatted in UI
-  agentId?: string;            // Reference to the agent who made the call
+  date: string;
+  agentId?: string;
   agentType: "main" | "follow_up" | "inbound";
-  outcome: string;             // Flexible outcome string (answered, no_answer, voicemail, declined)
-  summary: string;             // Call summary text
-  duration: string;            // Duration in "M:SS" format
-  // Rich analytics fields (from VAPI)
-  transcript?: string;         // Full call transcript
-  recordingUrl?: string;       // URL to call recording
-  cost?: number;               // Call cost in USD
-  sentimentScore?: number;     // Sentiment score (0-100)
+  outcome: string;
+  summary: string;
+  summary_en?: string;
+  summary_hi?: string;
+  intent?: string;
+  next_step?: string;
+  sentiment?: "positive" | "neutral" | "negative";
+  duration: string;
+  transcript?: string;
+  recordingUrl?: string;
+  cost?: number;
+  sentimentScore?: number;
 }
 
 /**
@@ -130,6 +134,10 @@ export interface CallHistoryItem {
   type: string;
   intent?: string;
   summary: string;
+  summary_en?: string;
+  summary_hi?: string;
+  next_step?: string;
+  sentiment?: "positive" | "neutral" | "negative";
   transcript?: string;
   recording_url?: string;
   agent_name?: string;

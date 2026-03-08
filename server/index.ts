@@ -127,6 +127,10 @@ app.use((req, res, next) => {
     express.urlencoded({ extended: false })(req, res, next);
   });
 
+  // ─── Tenant Context Middleware ────────────────────────────────────────────
+  const { attachTenantContext } = await import("../backend/middleware/tenantContext.js");
+  const tenantScoped = attachTenantContext;
+
   // ─── SOP: Node.js Auth Routes (replaces FastAPI proxy for /api/auth) ──────
   const authRoutes = (await import("../backend/routes/authRoutes.js")).default;
   app.use("/api/auth", authRoutes);
@@ -138,41 +142,42 @@ app.use((req, res, next) => {
       status: "ok",
       db: states[mongoose.connection.readyState] ?? "unknown",
       mongoUri: process.env.MONGODB_URI ? "set" : "MISSING",
+      tenantEnforcement: process.env.TENANT_ENFORCEMENT || "soft",
       timestamp: new Date().toISOString(),
     });
   });
 
   // ─── SOP: Bolna API Key Setup ─────────────────────────────────────────────
   const setupRoutes = (await import("../backend/routes/setupRoutes.js")).default;
-  app.use("/api/setup-api", setupRoutes);
+  app.use("/api/setup-api", tenantScoped, setupRoutes);
 
   // ─── SOP: Settings ────────────────────────────────────────────────────────
   const settingsRoutes = (await import("../backend/routes/settingsRoutes.js")).default;
-  app.use("/api/settings", settingsRoutes);
+  app.use("/api/settings", tenantScoped, settingsRoutes);
 
   // ─── SOP: Subscription (Razorpay) ────────────────────────────────────────
   const subscriptionRoutes = (await import("../backend/routes/subscriptionRoutes.js")).default;
-  app.use("/api/subscribe", subscriptionRoutes);
+  app.use("/api/subscribe", tenantScoped, subscriptionRoutes);
 
   // ─── SOP: CRM ─────────────────────────────────────────────────────────────
   const crmRoutes = (await import("../backend/routes/crmRoutes.js")).default;
-  app.use("/api/crm", crmRoutes);
+  app.use("/api/crm", tenantScoped, crmRoutes);
 
   // ─── SOP: Campaigns ───────────────────────────────────────────────────────
   const campaignRoutes = (await import("../backend/routes/campaignRoutes.js")).default;
-  app.use("/api/campaigns", campaignRoutes);
+  app.use("/api/campaigns", tenantScoped, campaignRoutes);
 
   // ─── SOP: Bolna Agent/Phone Number Proxy ─────────────────────────────────
   const bolnaRoutes = (await import("../backend/routes/bolnaRoutes.js")).default;
-  app.use("/api/bolna", bolnaRoutes);
+  app.use("/api/bolna", tenantScoped, bolnaRoutes);
 
   // ─── SOP: Dashboard ───────────────────────────────────────────────────────
   const dashboardRoutes = (await import("../backend/routes/dashboardRoutes.js")).default;
-  app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/dashboard", tenantScoped, dashboardRoutes);
 
   // ─── Existing: Call Processor Pipeline ───────────────────────────────────
   const callProcessorRoutes = (await import("../backend/routes/callProcessorRoutes.js")).default;
-  app.use("/api", callProcessorRoutes);
+  app.use("/api", tenantScoped, callProcessorRoutes);
 
   // Start the background poller (existing pipeline, uses BOLNA_API_KEY env var)
   const { startAutoPolling } = await import("../backend/services/scheduler.js");
@@ -180,7 +185,7 @@ app.use((req, res, next) => {
 
   // ─── Existing: Contact Routes (call-history contacts) ─────────────────────
   const contactRoutes = (await import("../backend/routes/contactRoutes.js")).default;
-  app.use("/api/contacts", contactRoutes);
+  app.use("/api/contacts", tenantScoped, contactRoutes);
 
   // ─── FastAPI Proxy Routes ─────────────────────────────────────────────────
   // NOTE: /api/auth is now handled by Node.js above, NOT proxied to FastAPI

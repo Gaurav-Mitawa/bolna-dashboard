@@ -62,6 +62,10 @@ export async function syncBolnaToCrm(user: IUser) {
                     const conversationEntry = {
                         date: new Date(execution.created_at),
                         summary: execution.extracted_data?.summary || `Call with ${agent.agent_name}`,
+                        summary_en: execution.extracted_data?.summary_en,
+                        summary_hi: execution.extracted_data?.summary_hi,
+                        next_step: execution.extracted_data?.next_step,
+                        sentiment: execution.extracted_data?.sentiment,
                         notes: execution.transcript || "No transcript available",
                     };
 
@@ -104,7 +108,7 @@ export async function syncBolnaToCrm(user: IUser) {
                                 totalUpdated++;
                             }
 
-                            await Customer.updateOne({ _id: existing._id }, updateQuery);
+                            await Customer.updateOne({ _id: existing._id, userId: user._id }, updateQuery);
                         } else {
                             // Create new
                             await Customer.create({

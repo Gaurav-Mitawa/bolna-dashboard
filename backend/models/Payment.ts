@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { tenantPlugin } from "../plugins/tenantPlugin.js";
 
 export interface IPayment extends Document {
   userId: mongoose.Types.ObjectId;
@@ -27,5 +28,12 @@ const paymentSchema = new Schema<IPayment>(
   },
   { timestamps: true }
 );
+
+// Query performance indexes
+paymentSchema.index({ userId: 1, status: 1 });
+paymentSchema.index({ userId: 1, createdAt: -1 });
+
+// Apply tenant isolation plugin
+paymentSchema.plugin(tenantPlugin);
 
 export const Payment = mongoose.model<IPayment>("Payment", paymentSchema);

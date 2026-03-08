@@ -15,6 +15,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 import { connectDB } from "./db.js";
 import { startAutoPolling } from "./services/scheduler.js";
+import { attachTenantContext } from "./middleware/tenantContext.js";
 
 // Route imports
 import authRoutes from "./routes/authRoutes.js";
@@ -71,16 +72,20 @@ import passportInstance from "./config/passport.js";
 app.use(passportInstance.initialize());
 app.use(passportInstance.session());
 
+// Tenant context middleware — attaches req.tenantId for all authenticated routes
+// Applied per-route-group (not globally) so public routes like auth/demo/webhooks are unaffected
+const tenantScoped = attachTenantContext;
+
 // Mount Routes
 app.use("/api/auth", authRoutes);
-app.use("/api/contacts", contactRoutes);
-app.use("/api/campaigns", campaignRoutes);
-app.use("/api/crm", crmRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/bolna", bolnaRoutes);
-app.use("/api/subscribe", subscriptionRoutes);
-app.use("/api/settings", settingsRoutes);
-app.use("/api/setup-api", setupRoutes);
+app.use("/api/contacts", tenantScoped, contactRoutes);
+app.use("/api/campaigns", tenantScoped, campaignRoutes);
+app.use("/api/crm", tenantScoped, crmRoutes);
+app.use("/api/dashboard", tenantScoped, dashboardRoutes);
+app.use("/api/bolna", tenantScoped, bolnaRoutes);
+app.use("/api/subscribe", tenantScoped, subscriptionRoutes);
+app.use("/api/settings", tenantScoped, settingsRoutes);
+app.use("/api/setup-api", tenantScoped, setupRoutes);
 app.use("/api/demo", demoRoutes);
 
 // Webhook route needs raw body for Razorpay HMAC verification
@@ -90,7 +95,7 @@ app.use(
     webhookRoutes
 );
 
-app.use("/api", callProcessorRoutes);
+app.use("/api", tenantScoped, callProcessorRoutes);
 
 // Global Error Handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -115,7 +120,9 @@ async function start() {
         }
 
         httpServer.listen({ port: PORT, host: "0.0.0.0" }, () => {
+            const tenantMode = process.env.TENANT_ENFORCEMENT || "soft";
             console.log(`[Backend] Unified server running on http://localhost:${PORT}`);
+            console.log(`[Backend] Tenant enforcement mode: ${tenantMode}`);
             startAutoPolling();
         });
 
