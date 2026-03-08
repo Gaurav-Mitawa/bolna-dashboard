@@ -1,11 +1,27 @@
 /**
- * Call History Page
- * Shows all call executions from Bolna Voice AI
+ * Call History Page — reads from MongoDB via /api/call-history (Phase 10)
+ * Frontend is unchanged; only the data source has moved from Bolna API to MongoDB.
  */
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { agentApi, executionsApi, BolnaExecution } from "@/lib/bolnaApi";
+
+// Shape returned by /api/call-history (same as BolnaExecution so rendering stays identical)
+type BolnaExecution = {
+  id: string;
+  agent_id: string;
+  batch_id?: string | null;
+  conversation_time: number;
+  total_cost: number;
+  cost_breakdown?: { llm: number; network: number; platform: number; synthesizer: number; transcriber: number } | null;
+  status: string;
+  transcript?: string | null;
+  created_at: string;
+  extracted_data?: Record<string, any> | null;
+  llm_analysis?: any | null;
+  telephony_data?: { to_number?: string | null; from_number?: string | null; call_type?: string; recording_url?: string | null };
+  agent_name?: string;
+};
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -51,55 +67,42 @@ export default function CallHistoryPage() {
   const [selectedExecution, setSelectedExecution] = useState<BolnaExecution | null>(null);
   const pageSize = 20;
 
-  // Fetch all agents for dropdown
-  const { data: agents } = useQuery({
-    queryKey: ['agents'],
-    queryFn: () => agentApi.getAll(),
+  // Fetch agent list from MongoDB (for dropdown filter)
+  const { data: agents } = useQuery<{ id: string; agent_name: string }[]>({
+    queryKey: ['call-history-agents'],
+    queryFn: async () => {
+      const res = await fetch('/api/call-history/agents', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
 
-  // Fetch executions
+  // Fetch call history from MongoDB via /api/call-history
   const {
     data: executionsData,
     isLoading,
-    refetch
+    refetch,
   } = useQuery({
-    queryKey: ['executions', selectedAgentId, statusFilter, callTypeFilter, page],
+    queryKey: ['call-history', selectedAgentId, statusFilter, callTypeFilter, page],
     queryFn: async () => {
-      if (selectedAgentId === 'all' || !selectedAgentId) {
-        // If we have agents, fetch from first agent
-        if (agents && agents.length > 0) {
-          const allExecutions = await Promise.all(
-            agents.slice(0, 5).map(agent =>
-              executionsApi.getByAgent(agent.id, {
-                page_number: page,
-                page_size: pageSize,
-                status: statusFilter !== 'all' ? statusFilter : undefined,
-                call_type: callTypeFilter !== 'all' ? callTypeFilter as 'inbound' | 'outbound' : undefined,
-              })
-            )
-          );
-          // Merge and sort by date
-          const mergedData = allExecutions.flatMap(r => r.data || []);
-          mergedData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          return {
-            data: mergedData.slice(0, pageSize),
-            total: allExecutions.reduce((sum, r) => sum + (r.total || 0), 0),
-            has_more: allExecutions.some(r => r.has_more),
-            page_number: page,
-            page_size: pageSize,
-          };
-        }
-        return { data: [], total: 0, has_more: false, page_number: 1, page_size: pageSize };
-      }
-
-      return executionsApi.getByAgent(selectedAgentId, {
-        page_number: page,
-        page_size: pageSize,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        call_type: callTypeFilter !== 'all' ? callTypeFilter as 'inbound' | 'outbound' : undefined,
+      const params = new URLSearchParams({
+        page_number: String(page),
+        page_size: String(pageSize),
       });
+      if (selectedAgentId !== 'all') params.set('agent_id', selectedAgentId);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (callTypeFilter !== 'all') params.set('call_type', callTypeFilter);
+
+      const res = await fetch(`/api/call-history?${params}`, { credentials: 'include' });
+      if (!res.ok) return { data: [], total: 0, has_more: false, page_number: 1, page_size: pageSize };
+      return res.json() as Promise<{
+        data: BolnaExecution[];
+        total: number;
+        has_more: boolean;
+        page_number: number;
+        page_size: number;
+      }>;
     },
-    enabled: !!agents,
   });
 
   const executions = executionsData?.data || [];

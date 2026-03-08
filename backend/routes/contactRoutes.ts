@@ -1,10 +1,7 @@
 import { Router, Request, Response } from "express";
 import { Contact } from "../models/Contact.js";
 import { Call } from "../models/Call.js";
-import { syncCallsForPhone } from "../services/callPoller.js";
-import { analyzeTranscript } from "../services/llmService.js";
-import { isAuthenticated, hasBolnaKey } from "../middleware/auth.js";
-import { getApiKey } from "../services/bolnaService.js";
+import { isAuthenticated } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -98,40 +95,10 @@ router.get("/:id", async (req: Request, res: Response) => {
             }
         }
 
-        let calls = await Call.find({ caller_number: contact.phone, userId })
+        // Call history read from MongoDB only (Phase 10 — poller syncs calls to DB)
+        const calls = await Call.find({ caller_number: contact.phone, userId })
             .sort({ call_timestamp: -1 })
             .lean();
-
-        if (calls.length === 0) {
-            console.log(`[Routes] No history found for ${contact.phone}, syncing from Bolna...`);
-            try {
-                const apiKey = getApiKey(req.user);
-                const syncedCalls = await syncCallsForPhone(contact.phone, apiKey);
-                console.log(`[Routes] Sync found ${syncedCalls.length} calls for ${contact.phone}`);
-
-                if (syncedCalls.length > 0) {
-                    for (const call of syncedCalls) {
-                        await Call.updateOne(
-                            { call_id: call.call_id, userId },
-                            {
-                                $set: {
-                                    ...call,
-                                    userId,
-                                    created_at: new Date(call.call_timestamp)
-                                },
-                                $setOnInsert: { processed: false }
-                            },
-                            { upsert: true }
-                        );
-                    }
-                    calls = await Call.find({ caller_number: contact.phone, userId })
-                        .sort({ call_timestamp: -1 })
-                        .lean();
-                }
-            } catch (err: any) {
-                console.error(`[Routes] Sync failed for ${contact.phone}:`, err.message);
-            }
-        }
 
         const callHistory = calls.map(call => ({
             id: call.call_id,

@@ -2,9 +2,10 @@ import mongoose, { Schema, Document } from "mongoose";
 import { tenantPlugin } from "../plugins/tenantPlugin.js";
 
 export interface ICall extends Document {
-    call_id: string;
-    userId: string;
-    agent_id: string;
+    call_id: string;        // bolnaCallId — Bolna-side unique ID, used as dedup key
+    userId: string;         // which tenant owns this call (from MongoDB Agent doc, never from Bolna)
+    agent_id: string;       // Bolna agent ID string
+    batch_id: string | null; // which Bolna campaign batch this call belongs to (nullable)
     caller_number: string;
     call_duration: number;
     call_timestamp: string;
@@ -38,14 +39,17 @@ export interface ICall extends Document {
     } | null;
     processed: boolean;
     raw_llm_output: string | null;
-    status: string | null;
+    bolna_updated_at: Date | null; // updated_at from Bolna — used by poller for change detection
+    synced_at: Date | null;        // when this record was last synced by the poller
     created_at: Date;
 }
 
 const CallSchema = new Schema<ICall>({
+    call_id: { type: String, required: true, unique: true, index: true },
     call_id: { type: String, required: true },
     userId: { type: String, required: true, index: true },
     agent_id: { type: String, required: true },
+    batch_id: { type: String, default: null, index: true },
     caller_number: { type: String, default: "" },
     call_duration: { type: Number, default: 0 },
     call_timestamp: { type: String, default: "" },
@@ -62,6 +66,8 @@ const CallSchema = new Schema<ICall>({
     },
     processed: { type: Boolean, default: false },
     raw_llm_output: { type: String, default: null },
+    bolna_updated_at: { type: Date, default: null },
+    synced_at: { type: Date, default: null },
     status: { type: String, default: null, index: true },
     created_at: { type: Date, default: Date.now },
 });

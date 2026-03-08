@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { Customer } from "../models/Customer.js";
 import { isAuthenticated, isSubscribed } from "../middleware/auth.js";
-import { syncBolnaToCrm } from "../services/crmSyncService.js";
+import { runSyncPoller } from "../services/syncPoller.js";
 import { generalLimiter } from "../middleware/rateLimiter.js";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
@@ -24,20 +24,19 @@ const upload = multer({
   },
 });
 
-// POST /api/crm/sync-bolna — Manually trigger Bolna execution sync
+// POST /api/crm/sync-bolna — Manually trigger the background sync poller
 router.post("/sync-bolna", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
   try {
-    const user = req.user as any;
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
-
-    const results = await syncBolnaToCrm(user);
+    // Run poller async — respond immediately so the UI doesn't hang
+    runSyncPoller().catch(err =>
+      console.error("[CrmRoutes] Manual sync poller error:", err)
+    );
     res.json({
       success: true,
-      message: "Sync completed",
-      data: results
+      message: "Sync started in background — data will update within a minute",
     });
   } catch (err: any) {
-    console.error("[CrmRoutes] Sync Bolna Error:", err.message);
+    console.error("[CrmRoutes] Sync trigger error:", err.message);
     res.status(500).json({ message: "Failed to sync with Bolna", error: err.message });
   }
 });
