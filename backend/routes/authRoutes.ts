@@ -73,6 +73,7 @@ router.get("/me", (req: Request, res: Response) => {
       trialExpiresAt: user.trialExpiresAt,
       trialStartedAt: user.trialStartedAt,
       isSubscriptionActive: user.isSubscriptionActive,
+      couponApplied: user.couponApplied || null,
     });
   } catch (err: any) {
     console.error("[Auth] Error in /me route:", err.message || err);

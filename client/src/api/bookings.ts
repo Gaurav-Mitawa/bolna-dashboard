@@ -25,6 +25,7 @@ export interface Booking {
   summary_en?: string;   // English summary from LLM
   summary_hi?: string;   // Hindi summary from LLM
   created_at: string;
+  call_date: string;         // When the call actually happened (always set from call_timestamp)
   // Legacy fields kept for component compatibility
   contact_id: string;
   service_date_raw: string;
@@ -81,7 +82,7 @@ function callToBooking(call: RawCall): Booking {
 
   // ── Date extraction with validation ───────────────────────────────────────
   // LLM may return non-ISO strings ("March 8"), "null", or empty.
-  // Validate before using; fall back to call_timestamp if LLM date is unusable.
+  // Validate before using; do NOT fall back to call_timestamp (that's the call date, not booking date).
   let serviceDate = "";
   let serviceTime = "";
 
@@ -93,23 +94,10 @@ function callToBooking(call: RawCall): Booking {
     }
   }
 
-  // Fallback: parse call_timestamp (stored as ISO string in MongoDB)
-  if (!serviceDate && call.call_timestamp) {
-    const dt = new Date(call.call_timestamp);
-    if (!isNaN(dt.getTime())) {
-      serviceDate = dt.toISOString().split("T")[0];
-      serviceTime = dt.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    }
-  }
-
   // ── Time extraction with sanitization ─────────────────────────────────────
   // LLM may return literal "null" string — treat that as no time.
   const rawTime = analysis?.booking?.time;
-  if (!serviceTime && rawTime && rawTime !== "null") {
+  if (rawTime && rawTime !== "null") {
     serviceTime = rawTime;
   }
 
@@ -133,6 +121,7 @@ function callToBooking(call: RawCall): Booking {
     summary_en: analysis?.summary_en ?? undefined,
     summary_hi: analysis?.summary_hi ?? undefined,
     created_at: call.created_at,
+    call_date: call.call_timestamp || call.created_at,  // when the call happened
     // Legacy compat
     contact_id: call.call_id,
     service_date_raw: call.call_timestamp,

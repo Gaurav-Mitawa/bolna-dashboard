@@ -5,7 +5,7 @@
 import { AgentWithStats } from "@/api/bolnaAgents";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, Settings, Mic, Loader2 } from "lucide-react";
+import { Mic, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PauseAgentButton } from "./PauseAgentButton";
 
@@ -135,36 +135,10 @@ export function AgentList({
                 {/* Actions */}
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-9 w-9",
-                        agent.is_active
-                          ? "text-yellow-600 hover:bg-yellow-50"
-                          : "text-green-600 hover:bg-green-50"
-                      )}
-                      onClick={() => onToggleStatus(agent.id, !agent.is_active)}
-                      disabled={isLoading}
-                    >
-                      {agent.is_active ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                    </Button>
                     <PauseAgentButton
                       agentId={agent.id}
                       agentName={agent.name}
                     />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-gray-600 hover:bg-gray-100"
-                      onClick={() => onOpenSettings(agent.id)}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
                   </div>
                 </td>
               </tr>

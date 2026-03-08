@@ -142,7 +142,7 @@ export function tenantPlugin(schema: Schema): void {
 
     // ─── insertMany middleware ────────────────────────────────────────────────
 
-    (schema as any).pre("insertMany", function (this: any, next: Function, docs: any[]) {
+    (schema as any).pre("insertMany", function (this: any, docs: any[]) {
         const mode = getEnforcementMode();
         const collectionName = this.modelName || "unknown";
 
@@ -157,15 +157,13 @@ export function tenantPlugin(schema: Schema): void {
                 });
 
                 if (mode === "strict") {
-                    return next(
-                        new Error(
-                            `[TenantPlugin] STRICT MODE: Cannot insertMany into "${collectionName}" — ` +
-                            `one or more documents missing userId.`
-                        )
+                    throw new Error(
+                        `[TenantPlugin] STRICT MODE: Cannot insertMany into "${collectionName}" — ` +
+                        `one or more documents missing userId.`
                     );
                 }
             }
         }
-        next();
+        // Mongoose 8: pre-insertMany hook is synchronous — no next() call needed
     });
 }
