@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { Customer } from "../models/Customer.js";
 import { isAuthenticated, isSubscribed } from "../middleware/auth.js";
+import { attachTenantContext } from "../middleware/tenantContext.js";
 import { runSyncPoller } from "../services/syncPoller.js";
 import { generalLimiter } from "../middleware/rateLimiter.js";
 import multer from "multer";
@@ -11,6 +12,11 @@ interface MulterRequest extends Request {
 }
 
 const router = Router();
+
+// Apply tenant context at the router level so this file is self-sufficient.
+// Even if the parent server.ts forgets to apply tenantScoped, all CRM routes
+// still get req.tenantId set correctly from the authenticated session.
+router.use(isAuthenticated, attachTenantContext);
 
 // Configure multer for bulk upload
 const upload = multer({
