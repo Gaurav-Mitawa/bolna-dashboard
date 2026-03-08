@@ -105,7 +105,7 @@ export const crmApi = {
     return res.data;
   },
 
-  syncBolna: async (): Promise<{ success: boolean; data: { processed: number; created: number; updated: number } }> => {
+  syncBolna: async (): Promise<{ success: boolean; message: string }> => {
     const res = await axios.post(`${BASE}/sync-bolna`);
     return res.data;
   },

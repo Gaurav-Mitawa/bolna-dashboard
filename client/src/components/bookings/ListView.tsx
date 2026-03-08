@@ -59,16 +59,18 @@ export function ListView({ bookings, onBookingClick }: ListViewProps) {
     if (!dateStr) return "—";
     try {
       const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "—"; // guard against Invalid Date → "undefined NaN, NaN"
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
     } catch {
-      return dateStr;
+      return "—";
     }
   };
 
-  // Format call duration
+  // Format call duration — treat 0s as valid, not as missing
   const formatDuration = (seconds: number): string => {
-    if (!seconds) return "—";
+    if (seconds == null || isNaN(seconds)) return "—";
+    if (seconds === 0) return "0s";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;

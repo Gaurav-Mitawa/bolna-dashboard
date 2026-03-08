@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { Contact } from "../models/Contact.js";
 import { Call } from "../models/Call.js";
 import { isAuthenticated } from "../middleware/auth.js";
+import { attachTenantContext } from "../middleware/tenantContext.js";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 
@@ -23,8 +24,8 @@ const upload = multer({
     },
 });
 
-// Apply authentication to all routes
-router.use(isAuthenticated);
+// Apply authentication + tenant context to all routes — self-sufficient regardless of server.ts mounting
+router.use(isAuthenticated, attachTenantContext);
 
 // GET /api/contacts - List all contacts with filters
 router.get("/", async (req: Request, res: Response) => {
