@@ -363,8 +363,8 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                     },
                 };
                 if (status !== "fresh") contactUpdate.$set.tag = status;
-                if (analysis.contact_name && !analysis.contact_name.toLowerCase().includes("bolna lead")) {
-                    contactUpdate.$set.name = analysis.contact_name;
+                if (analysis.customer_name && !analysis.customer_name.toLowerCase().includes("bolna lead")) {
+                    contactUpdate.$set.name = analysis.customer_name;
                 }
 
                 try {
@@ -390,10 +390,10 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                     };
                 }
                 if (
-                    analysis.contact_name &&
-                    !analysis.contact_name.toLowerCase().includes("bolna lead")
+                    analysis.customer_name &&
+                    !analysis.customer_name.toLowerCase().includes("bolna lead")
                 ) {
-                    customerUpdate.$set.name = analysis.contact_name;
+                    customerUpdate.$set.name = analysis.customer_name;
                 }
 
                 try {
