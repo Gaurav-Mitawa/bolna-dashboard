@@ -164,8 +164,8 @@ export default function Dashboard() {
   const intentData = useMemo(() => {
     const counts: Record<string, number> = {};
     filteredExecutions.forEach((e) => {
-      // Prefer LLM-analyzed intent from MongoDB; fall back to extracted_data
-      const intent = extractIntent(e, mode, e.llm_analysis?.intent);
+      // extracted_data from Bolna API already has intent / lead_status fields
+      const intent = extractIntent(e, mode);
       counts[intent] = (counts[intent] || 0) + 1;
     });
     return [
