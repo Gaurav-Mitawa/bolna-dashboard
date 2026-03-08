@@ -22,6 +22,8 @@ export interface Booking {
   call_direction: string;
   transcript?: string;
   summary?: string;
+  summary_en?: string;   // English summary from LLM
+  summary_hi?: string;   // Hindi summary from LLM
   created_at: string;
   // Legacy fields kept for component compatibility
   contact_id: string;
@@ -47,8 +49,10 @@ interface RawCall {
   call_direction: string;
   llm_analysis: {
     summary: string;
+    summary_en?: string | null;   // English summary stored by LLM service
+    summary_hi?: string | null;   // Hindi summary stored by LLM service
     intent: string;
-    contact_name?: string | null;
+    customer_name?: string | null; // field name in MongoDB ICall.llm_analysis
     call_direction: string;
     booking: {
       is_booked: boolean;
@@ -75,23 +79,44 @@ function callToBooking(call: RawCall): Booking {
   else if (intent === "queries") status = "pending";
   else if (intent === "not_interested") status = "cancelled";
 
-  // Extract date/time from LLM analysis or fallback to call timestamp
-  let serviceDate = analysis?.booking?.date || "";
-  let serviceTime = analysis?.booking?.time || "";
+  // ── Date extraction with validation ───────────────────────────────────────
+  // LLM may return non-ISO strings ("March 8"), "null", or empty.
+  // Validate before using; fall back to call_timestamp if LLM date is unusable.
+  let serviceDate = "";
+  let serviceTime = "";
 
+  const rawDate = analysis?.booking?.date;
+  if (rawDate && rawDate !== "null") {
+    const parsed = new Date(rawDate);
+    if (!isNaN(parsed.getTime())) {
+      serviceDate = rawDate; // use as-is only if it parses
+    }
+  }
+
+  // Fallback: parse call_timestamp (stored as ISO string in MongoDB)
   if (!serviceDate && call.call_timestamp) {
     const dt = new Date(call.call_timestamp);
-    serviceDate = dt.toISOString().split("T")[0];
-    serviceTime = dt.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
+    if (!isNaN(dt.getTime())) {
+      serviceDate = dt.toISOString().split("T")[0];
+      serviceTime = dt.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+  }
+
+  // ── Time extraction with sanitization ─────────────────────────────────────
+  // LLM may return literal "null" string — treat that as no time.
+  const rawTime = analysis?.booking?.time;
+  if (!serviceTime && rawTime && rawTime !== "null") {
+    serviceTime = rawTime;
   }
 
   return {
     id: call.call_id,
-    contact_name: analysis?.contact_name || call.caller_number || "Unknown",
+    // Fix: MongoDB stores customer_name (not contact_name) in llm_analysis
+    contact_name: analysis?.customer_name || call.caller_number || "Unknown",
     service_name: analysis?.summary || "Call",
     service_date: serviceDate,
     service_time: serviceTime,
@@ -105,6 +130,8 @@ function callToBooking(call: RawCall): Booking {
     call_direction: call.call_direction,
     transcript: call.transcript,
     summary: analysis?.summary,
+    summary_en: analysis?.summary_en ?? undefined,
+    summary_hi: analysis?.summary_hi ?? undefined,
     created_at: call.created_at,
     // Legacy compat
     contact_id: call.call_id,

@@ -49,8 +49,8 @@ export default function ContactsPage() {
     refetchInterval: 60_000,
   });
 
-  // Cast contacts to the expected type
-  const contacts = contactsData as Contact[] | undefined;
+  // Extract contacts array from paginated response { contacts: Contact[], pagination: {...} }
+  const contacts = contactsData?.contacts;
 
   // Filter by source on frontend (if backend doesn't support it)
   const filteredContacts = useMemo(() => {
@@ -340,7 +340,7 @@ export default function ContactsPage() {
           </Select>
         </div>
         <div className="text-sm text-gray-500">
-          Showing {filteredContacts?.length || 0} of {contacts?.length || 0} contacts
+          Showing {filteredContacts?.length || 0} of {contactsData?.pagination?.total || contacts?.length || 0} contacts
         </div>
       </div>
 

@@ -1,10 +1,16 @@
 /**
  * Booking Detail Modal
- * Shows full details of an LLM-processed call booking
+ * Shows full details of an LLM-processed call booking with:
+ * - Fixed date/time display (isNaN guard)
+ * - EN/HI summary language toggle
+ * - Inline summary edit (saves to /api/call-bookings/:id)
  */
 
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Phone, Calendar, Clock, FileText, ArrowUpDown, Timer } from "lucide-react";
+import { Phone, Calendar, Clock, FileText, ArrowUpDown, Timer, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import type { Booking } from "@/api/bookings";
 
 interface BookingDetailModalProps {
@@ -37,14 +43,22 @@ const intentBadge: Record<string, { label: string; className: string }> = {
 };
 
 export function BookingDetailModal({ open, onOpenChange, booking }: BookingDetailModalProps) {
+  const queryClient = useQueryClient();
+  const [lang, setLang] = useState<"en" | "hi">("en");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSummary, setEditedSummary] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
   if (!booking) return null;
 
   const intent = intentBadge[booking.intent_category] || intentBadge.queries;
 
+  // Format date with isNaN guard — prevents "undefined NaN, NaN"
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return "—";
     try {
       const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "—"; // guard: Invalid Date renders as-is
       return date.toLocaleDateString("en-US", {
         weekday: "long",
         year: "numeric",
@@ -52,16 +66,50 @@ export function BookingDetailModal({ open, onOpenChange, booking }: BookingDetai
         day: "numeric",
       });
     } catch {
-      return dateStr;
+      return "—";
     }
   };
 
+  // Format duration — treat 0 as valid (not missing)
   const formatDuration = (seconds: number): string => {
-    if (!seconds) return "—";
+    if (seconds == null || isNaN(seconds)) return "—";
+    if (seconds === 0) return "0s";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
+
+  const handleEditOpen = () => {
+    setEditedSummary(booking.summary || "");
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/call-bookings/${booking.id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary: editedSummary }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast.success("Summary updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["bookings-booked"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings-all"] });
+      setIsEditing(false);
+    } catch {
+      toast.error("Failed to save summary. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Pick the summary to display based on language toggle
+  const displaySummary =
+    lang === "hi"
+      ? booking.summary_hi || booking.summary || "No Hindi summary available"
+      : booking.summary_en || booking.summary || "No summary available";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,16 +183,73 @@ export function BookingDetailModal({ open, onOpenChange, booking }: BookingDetai
             </div>
           </div>
 
-          {/* AI Summary */}
-          {booking.summary && (
+          {/* AI Summary — with EN/HI toggle + inline edit */}
+          {(booking.summary || booking.summary_en || booking.summary_hi) && (
             <div className="pt-4 border-t border-gray-100">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="h-4 w-4 text-purple-500" />
-                <span className="text-sm font-medium text-gray-700">AI Summary</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium text-gray-700">AI Summary</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Language toggle */}
+                  <div className="flex rounded-md overflow-hidden border border-gray-200 text-xs">
+                    <button
+                      onClick={() => setLang("en")}
+                      className={`px-2.5 py-1 font-medium transition-colors ${lang === "en" ? "bg-orange-500 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      onClick={() => setLang("hi")}
+                      className={`px-2.5 py-1 font-medium transition-colors border-l border-gray-200 ${lang === "hi" ? "bg-orange-500 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                    >
+                      हि
+                    </button>
+                  </div>
+                  {/* Edit toggle */}
+                  {!isEditing && (
+                    <button
+                      onClick={handleEditOpen}
+                      title="Edit summary"
+                      className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="text-sm text-gray-600 bg-purple-50 rounded-lg p-3 border border-purple-100">
-                {booking.summary}
-              </p>
+
+              {isEditing ? (
+                <div className="space-y-2">
+                  <textarea
+                    className="w-full text-sm text-gray-700 bg-purple-50 rounded-lg p-3 border border-purple-200 min-h-[100px] resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    value={editedSummary}
+                    onChange={(e) => setEditedSummary(e.target.value)}
+                    placeholder="Enter updated summary..."
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      disabled={isSaving}
+                      className="text-xs text-gray-500 px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-md hover:bg-orange-600 disabled:opacity-50"
+                    >
+                      {isSaving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600 bg-purple-50 rounded-lg p-3 border border-purple-100">
+                  {displaySummary}
+                </p>
+              )}
             </div>
           )}
 

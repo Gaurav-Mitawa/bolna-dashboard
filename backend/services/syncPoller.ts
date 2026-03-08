@@ -25,6 +25,9 @@ import { normalizePhone } from "../utils/phoneUtils.js";
 const BOLNA_API = "https://api.bolna.ai";
 const DELAY_BETWEEN_LLM_MS = 10_000;
 const MAX_LLM_PER_RUN = 5;
+// A call that fails LLM analysis this many times is permanently skipped (processed=true)
+// This prevents a bad/short/garbage transcript from blocking the queue forever.
+const MAX_LLM_RETRIES = 3;
 
 // ─── HTTP helper ─────────────────────────────────────────────────────────────
 
@@ -248,6 +251,7 @@ async function syncCallsForAgent(
                         },
                         $setOnInsert: {
                             processed: false,
+                            llm_retries: 0,
                             llm_analysis: null,
                             raw_llm_output: null,
                         },
@@ -304,6 +308,11 @@ async function runLlmAnalysis(runId: string): Promise<number> {
         processed: false,
         llm_analysis: null,
         transcript: { $exists: true, $ne: "" },
+        // Exclude calls that have already exhausted all retry attempts.
+        // `$not: { $gte: MAX_LLM_RETRIES }` also matches docs where llm_retries is
+        // missing/null (legacy records created before this field existed), so old
+        // unanalyzed calls are not silently abandoned after a schema migration.
+        llm_retries: { $not: { $gte: MAX_LLM_RETRIES } },
     })
         .sort({ created_at: -1 })
         .limit(MAX_LLM_PER_RUN)
@@ -410,11 +419,33 @@ async function runLlmAnalysis(runId: string): Promise<number> {
             console.log(`[SyncPoller][${runId}] ✓ LLM done for ${call.call_id} — intent: ${analysis?.intent}`);
         } catch (err: any) {
             console.error(`[SyncPoller][${runId}] LLM failed for ${call.call_id}:`, err.message);
-            // Mark processed=true to avoid retrying a call that consistently fails
+
+            // Increment the retry counter. If it has now reached the ceiling,
+            // mark processed=true so this call is permanently skipped on future
+            // runs. Otherwise leave processed=false — the next poller run will
+            // retry automatically (up to MAX_LLM_RETRIES attempts total).
+            const newRetryCount = (call.llm_retries ?? 0) + 1;
+            const exhausted = newRetryCount >= MAX_LLM_RETRIES;
+
             await Call.updateOne(
                 { call_id: call.call_id },
-                { $set: { processed: true } }
+                {
+                    $set: {
+                        llm_retries: newRetryCount,
+                        ...(exhausted && { processed: true }),
+                    },
+                }
             );
+
+            if (exhausted) {
+                console.warn(
+                    `[SyncPoller][${runId}] Call ${call.call_id} exhausted ${MAX_LLM_RETRIES} LLM retries — permanently skipped.`
+                );
+            } else {
+                console.log(
+                    `[SyncPoller][${runId}] Call ${call.call_id} will be retried (attempt ${newRetryCount}/${MAX_LLM_RETRIES}).`
+                );
+            }
         }
     }
 

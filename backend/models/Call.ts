@@ -38,6 +38,7 @@ export interface ICall extends Document {
         };
     } | null;
     processed: boolean;
+    llm_retries: number;           // how many times LLM analysis has been attempted and failed
     raw_llm_output: string | null;
     bolna_updated_at: Date | null; // updated_at from Bolna — used by poller for change detection
     synced_at: Date | null;        // when this record was last synced by the poller
@@ -66,6 +67,7 @@ const CallSchema = new Schema<ICall>({
         default: null,
     },
     processed: { type: Boolean, default: false },
+    llm_retries: { type: Number, default: 0 },
     raw_llm_output: { type: String, default: null },
     bolna_updated_at: { type: Date, default: null },
     synced_at: { type: Date, default: null },

@@ -154,7 +154,7 @@ router.get(
 
 /**
  * GET /api/call-bookings
- * Returns calls where LLM detected a booking or intent is "interested".
+ * Returns calls where LLM detected a booking (is_booked=true or intent="booked").
  * Always scoped to the authenticated user.
  */
 router.get(
@@ -169,7 +169,7 @@ router.get(
                 userId,
                 $or: [
                     { "llm_analysis.booking.is_booked": true },
-                    { "llm_analysis.intent": "interested" },
+                    { "llm_analysis.intent": "booked" },
                 ],
             };
 
@@ -291,6 +291,44 @@ router.get(
             if (!doc) return res.status(404).json({ error: "Not found" });
             res.json(doc);
         } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+);
+
+/**
+ * PUT /api/call-bookings/:call_id
+ * Update LLM summary fields (English + Hindi) for a booking.
+ * Scoped to the authenticated user — only the owner can update.
+ */
+router.put(
+    "/call-bookings/:call_id",
+    isAuthenticated,
+    isSubscribed,
+    async (req: Request, res: Response) => {
+        try {
+            const userId = (req.user as any)._id.toString();
+            const { summary, summary_en, summary_hi } = req.body;
+
+            const update: any = {};
+            if (summary    !== undefined) update["llm_analysis.summary"]    = summary;
+            if (summary_en !== undefined) update["llm_analysis.summary_en"] = summary_en;
+            if (summary_hi !== undefined) update["llm_analysis.summary_hi"] = summary_hi;
+
+            if (Object.keys(update).length === 0) {
+                return res.status(400).json({ error: "No fields to update" });
+            }
+
+            const doc = await Call.findOneAndUpdate(
+                { call_id: req.params.call_id, userId },
+                { $set: update },
+                { new: true }
+            ).lean();
+
+            if (!doc) return res.status(404).json({ error: "Call not found" });
+            res.json({ success: true });
+        } catch (err: any) {
+            console.error("[Route] PUT /call-bookings error:", err.message);
             res.status(500).json({ error: err.message });
         }
     }
