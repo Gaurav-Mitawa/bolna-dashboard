@@ -184,19 +184,56 @@ router.post(
         trim: true,
       });
 
-      const phoneRegex = /^\+[1-9]\d{6,14}$/;
       const processed: any[] = [];
       const errors: any[] = [];
-      const user = req.user as any;
+
+      // Full normalizer — handles scientific notation, leading zeros, hyphens, 12-digit, etc.
+      const normalizePhone = (raw: string): string | null => {
+        let val = String(raw ?? "").trim();
+        if (!val) return null;
+        // Excel scientific notation (e.g. 9.17471E+11 → 917471000000)
+        if (/[eE]/.test(val) && /^\d/.test(val)) {
+          const num = Number(val);
+          if (!isNaN(num) && isFinite(num)) val = Math.round(num).toString();
+        }
+        // Strip hyphens, spaces, dots, parentheses
+        val = val.replace(/[\s\-\.\(\)]/g, "");
+        // Already correct Indian E.164 (+91XXXXXXXXXX starting 6-9)
+        if (/^\+91[6-9]\d{9}$/.test(val)) return val;
+        // Valid non-Indian E.164 (+1…, +44…, etc.)
+        if (/^\+[1-9]\d{6,14}$/.test(val) && !val.startsWith("+91")) return val;
+        // Has +91 prefix — check length and start digit
+        if (val.startsWith("+91")) {
+          const d = val.slice(3);
+          if (d.length === 10 && /^[6-9]/.test(d)) return "+91" + d;
+          return null;
+        }
+        // 12 digits: 91XXXXXXXXXX (no +)
+        if (/^91\d{10}$/.test(val)) {
+          const d = val.slice(2);
+          return /^[6-9]/.test(d) ? "+91" + d : null;
+        }
+        // 10-digit Indian number (no prefix)
+        if (/^\d{10}$/.test(val)) {
+          return /^[6-9]/.test(val) ? "+91" + val : null;
+        }
+        // Leading zero: 09876543210
+        if (/^0\d{10}$/.test(val)) {
+          const s = val.slice(1);
+          return /^[6-9]/.test(s) ? "+91" + s : null;
+        }
+        return null;
+      };
+
+      const VALID_STATUSES = ["fresh", "interested", "not_interested", "booked", "NA", "queries"];
 
       for (const row of rawRecords) {
-        let phone = (row.phoneNumber || row.phone || "").trim();
+        // Accept any common phone column header
+        const rawPhone = (row.phoneNumber || row.phone || row.mobile || row.contact || row.mob || "").trim();
+        const phone = normalizePhone(rawPhone);
 
-        // Auto-add +91 if number is 10 digits (Indian numbers)
-        if (/^\d{10}$/.test(phone)) phone = "+91" + phone;
-
-        if (!phone || !phoneRegex.test(phone)) {
-          errors.push({ row: row.name || "Unknown", reason: "Invalid phone number" });
+        if (!phone) {
+          errors.push({ row: row.name || rawPhone || "Unknown", reason: `Invalid phone: "${rawPhone}"` });
           continue;
         }
 
@@ -205,12 +242,14 @@ router.post(
           continue;
         }
 
+        const status = VALID_STATUSES.includes(row.status) ? row.status : "fresh";
+
         processed.push({
           userId: req.tenantId,
           name: row.name.trim(),
           phoneNumber: phone,
-          email: (row.email || "").trim(),
-          status: "fresh",
+          email: (row.email || "").trim().toLowerCase(),
+          status,
         });
       }
 
