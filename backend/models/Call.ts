@@ -41,13 +41,14 @@ export interface ICall extends Document {
     raw_llm_output: string | null;
     bolna_updated_at: Date | null; // updated_at from Bolna — used by poller for change detection
     synced_at: Date | null;        // when this record was last synced by the poller
+    status: string | null;
     created_at: Date;
 }
 
 const CallSchema = new Schema<ICall>({
     call_id: { type: String, required: true, unique: true, index: true },
-    call_id: { type: String, required: true },
     userId: { type: String, required: true, index: true },
+
     agent_id: { type: String, required: true },
     batch_id: { type: String, default: null, index: true },
     caller_number: { type: String, default: "" },

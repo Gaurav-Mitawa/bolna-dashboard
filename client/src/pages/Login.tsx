@@ -112,7 +112,7 @@ export default function LoginPage() {
                     ? "⚠️ Session could not be saved. Please try again."
                     : errorMsg === "auth_failed"
                       ? "Login was cancelled or failed. Please try again."
-                      : "Login failed. Please try again."}
+                      : `Login failed: ${searchParams.get("detail") || "Please try again."}`}
               </div>
             )}
 

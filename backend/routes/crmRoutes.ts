@@ -264,28 +264,43 @@ router.post(
       let insertedCount = 0;
       let skippedCount = 0;
 
-      try {
-        const result = await Customer.insertMany(deduplicated, { ordered: false });
-        insertedCount = result.length;
-      } catch (bulkErr: any) {
-        if (bulkErr.name === "BulkWriteError" || bulkErr.code === 11000 || bulkErr.writeErrors) {
-          insertedCount = bulkErr.result?.nInserted || 0;
-          skippedCount = (bulkErr.writeErrors?.length || 0) + (deduplicated.length - (bulkErr.result?.nInserted || 0) - (bulkErr.writeErrors?.length || 0));
-          // Adjust skipped count: total deduplicated - inserted
-          skippedCount = deduplicated.length - insertedCount;
-        } else {
-          throw bulkErr;
+      if (!req.tenantId) {
+        console.error("[CrmRoutes] Missing tenantId in bulk upload request");
+        return res.status(401).json({ message: "Tenant context missing — please re-login" });
+      }
+
+      if (deduplicated.length > 0) {
+        try {
+          const result = await Customer.insertMany(deduplicated, { ordered: false });
+          insertedCount = result.length;
+        } catch (bulkErr: any) {
+          // Handle partial successes/failures from insertMany (e.g. 11000 duplicate keys)
+          if (bulkErr.name === "BulkWriteError" || bulkErr.code === 11000 || bulkErr.writeErrors) {
+            insertedCount = bulkErr.result?.nInserted || 0;
+            skippedCount = deduplicated.length - insertedCount;
+            console.log(`[CrmRoutes] Bulk upload partial success: ${insertedCount} inserted, ${skippedCount} skipped`);
+          } else {
+            console.error("[CrmRoutes] Critical Bulk upload error:", bulkErr);
+            throw bulkErr;
+          }
         }
       }
 
       res.json({
-        message: "Bulk upload complete",
-        inserted: insertedCount,
+        message: deduplicated.length === 0 ? "No valid leads found in CSV" : "Bulk upload complete",
+        inserted: insertedCount, // Keep both for safety
         skipped: skippedCount,
+        insertedCount, // Match frontend expectation
+        skippedCount,
         validationErrors: errors,
       });
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Bulk upload failed" });
+      console.error("[CrmRoutes] 500 Bulk upload failure:", err);
+      res.status(500).json({
+        message: "Bulk upload failed on server",
+        error: err.message,
+        details: process.env.NODE_ENV === "development" ? err.stack : undefined
+      });
     }
   }
 );
