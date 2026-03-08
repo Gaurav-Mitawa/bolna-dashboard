@@ -31,6 +31,7 @@ import settingsRoutes from "./routes/settingsRoutes.js";
 import setupRoutes from "./routes/setupRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import demoRoutes from "./routes/demoRoutes.js";
+import { attachTenantContext } from "./middleware/tenantContext.js";
 
 const app = express();
 const httpServer = createServer(app);

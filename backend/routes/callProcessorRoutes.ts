@@ -72,6 +72,12 @@ router.get(
             if (req.query.call_type && req.query.call_type !== "all") {
                 filter.call_direction = req.query.call_type;
             }
+            if (req.query.from) {
+                filter.call_timestamp = { ...filter.call_timestamp, $gte: new Date(req.query.from as string) };
+            }
+            if (req.query.to) {
+                filter.call_timestamp = { ...filter.call_timestamp, $lte: new Date(req.query.to as string) };
+            }
 
             const [total, calls] = await Promise.all([
                 Call.countDocuments(filter),
@@ -292,29 +298,6 @@ router.get(
 
 /**
  * GET /api/internal/call-status/:call_id
- * Processing status of a specific call. Scoped to authenticated user.
- */
-router.get(
-    "/internal/call-status/:call_id",
-    isAuthenticated,
-    async (req: Request, res: Response) => {
-        try {
-            const userId = (req.user as any)._id.toString();
-            const doc = await Call.findOne({
-                call_id: req.params.call_id,
-                userId,
-            }).lean();
-            if (!doc) return res.status(404).json({ exists: false });
-            res.json({
-                exists: true,
-                processed: doc.processed,
-                intent: doc.llm_analysis?.intent || null,
-                is_booked: doc.llm_analysis?.booking?.is_booked || false,
-                call_direction: doc.call_direction || "unknown",
-            });
-        } catch (err: any) {
-            res.status(500).json({ error: err.message });
-        }
  * Check processing status of a specific call — scoped to current user.
  */
 router.get("/internal/call-status/:call_id", isAuthenticated, async (req: Request, res: Response) => {
@@ -332,6 +315,6 @@ router.get("/internal/call-status/:call_id", isAuthenticated, async (req: Reques
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
-);
+});
 
 export default router;

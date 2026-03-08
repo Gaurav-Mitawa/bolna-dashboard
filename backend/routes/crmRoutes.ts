@@ -251,6 +251,54 @@ router.post(
   }
 );
 
+// POST /api/crm/bulk-json — Phase 7: accept pre-normalized rows from the frontend
+// The frontend has already validated + normalized all phone numbers to E.164.
+// This endpoint simply inserts them and handles DB-level duplicates.
+router.post("/bulk-json", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ message: "No rows provided" });
+    }
+
+    const VALID_STATUSES = ["fresh", "interested", "not_interested", "booked", "NA", "queries"];
+
+    const docs = rows
+      .map((r: any) => ({
+        userId: req.tenantId,
+        name: String(r.name || "").trim(),
+        phoneNumber: String(r.phoneNumber || "").trim(),
+        email: String(r.email || "").trim().toLowerCase(),
+        status: VALID_STATUSES.includes(r.status) ? r.status : "fresh",
+      }))
+      .filter(d => d.name && d.phoneNumber);
+
+    if (docs.length === 0) {
+      return res.status(400).json({ message: "No valid rows after filtering" });
+    }
+
+    let insertedCount = 0;
+    let skippedCount  = 0;
+
+    try {
+      const result = await Customer.insertMany(docs, { ordered: false });
+      insertedCount = result.length;
+    } catch (bulkErr: any) {
+      if (bulkErr.code === 11000 || bulkErr.writeErrors) {
+        insertedCount = bulkErr.result?.nInserted ?? 0;
+        skippedCount  = docs.length - insertedCount;
+      } else {
+        throw bulkErr;
+      }
+    }
+
+    res.json({ inserted: insertedCount, skipped: skippedCount });
+  } catch (err: any) {
+    console.error("[CrmRoutes] bulk-json error:", err.message);
+    res.status(500).json({ message: err.message || "Bulk import failed" });
+  }
+});
+
 // PUT /api/crm/:id — update lead
 router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
   try {
