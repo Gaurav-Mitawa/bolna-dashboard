@@ -9,7 +9,8 @@
     "dev:backend": "npx tsx backend/server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "tsc"
+    "check": "tsc",
+    "seed:coupon": "npx tsx backend/scripts/seedCoupon.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

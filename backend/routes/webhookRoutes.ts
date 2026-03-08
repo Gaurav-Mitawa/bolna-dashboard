@@ -7,6 +7,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { Payment } from "../models/Payment.js";
 import { activateSubscription } from "./subscriptionRoutes.js";
+import { skipTenantEnforcement } from "../plugins/tenantPlugin.js";
 
 const router = Router();
 
@@ -33,7 +34,11 @@ router.post("/razorpay", async (req: Request, res: Response) => {
       const paymentId = payment.id;
 
       // Find the pending payment record to get userId
-      const paymentRecord = await Payment.findOne({ razorpayOrderId: orderId });
+      // Webhook doesn't have session auth, so we skip tenant enforcement here
+      // and resolve userId from the payment record itself
+      const paymentRecord = await skipTenantEnforcement(
+        Payment.findOne({ razorpayOrderId: orderId })
+      );
       if (!paymentRecord) {
         console.warn(`[Webhook] No payment record for order ${orderId}`);
         return res.status(200).json({ received: true }); // acknowledge to avoid retries

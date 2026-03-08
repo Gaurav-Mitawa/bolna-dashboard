@@ -15,6 +15,7 @@ export interface CrmCustomer {
   email?: string;
   status: CustomerStatus;
   pastConversations: IPastConversation[];
+  callDirections?: ("inbound" | "outbound")[];
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +46,7 @@ export interface CrmStats {
 
 export interface CrmListParams {
   status?: CustomerStatus | "all";
+  direction?: "inbound" | "outbound" | "all";
   search?: string;
   page?: number;
   limit?: number;

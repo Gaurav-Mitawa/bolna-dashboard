@@ -11,6 +11,8 @@ export interface IUser extends Document {
   currentPeriodStart: Date | null;      // start of paid month
   trialStartedAt: Date | null;          // start of 7-day trial
   trialExpiresAt: Date | null;          // end of 7-day trial
+  trialEndDate: Date | null;            // NEW: Primary trial end date (source of truth)
+  couponApplied: string | null;         // NEW: Track which coupon was used
   createdAt: Date;
   isSubscriptionActive: boolean;        // virtual
 }
@@ -31,6 +33,8 @@ const userSchema = new Schema<IUser>(
     currentPeriodStart: { type: Date, default: null },
     trialStartedAt: { type: Date, default: null },
     trialExpiresAt: { type: Date, default: null },
+    trialEndDate: { type: Date, default: null },
+    couponApplied: { type: String, default: null },
   },
   { timestamps: true }
 );

@@ -47,9 +47,9 @@ export async function processNewCalls(userId: string, apiKey: string) {
     let synced = 0;
     for (const call of newCalls) {
         try {
-            // 1. Upsert Call (processed: false initially)
+            // 1. Upsert Call (processed: false initially) — scoped to this user
             await Call.updateOne(
-                { call_id: call.call_id },
+                { call_id: call.call_id, userId },
                 {
                     $set: {
                         userId,
@@ -106,9 +106,9 @@ export async function processNewCalls(userId: string, apiKey: string) {
                     );
                 } catch (dupErr: any) {
                     if (dupErr.code === 11000) {
-                        // Contact already exists with this phone — just update it
+                        // Contact already exists with this phone for this user — just update it
                         await Contact.findOneAndUpdate(
-                            { phone: normalizedContactPhone },
+                            { userId, phone: normalizedContactPhone },
                             { $set: { updated_at: new Date() } }
                         );
                     } else {
@@ -137,8 +137,8 @@ export async function processNewCalls(userId: string, apiKey: string) {
 
         const call = newCalls[i];
 
-        // Check if already processed to avoid re-running LLM
-        const existingCall = await Call.findOne({ call_id: call.call_id });
+        // Check if already processed to avoid re-running LLM — scoped to this user
+        const existingCall = await Call.findOne({ call_id: call.call_id, userId });
         if (existingCall && existingCall.processed) {
             continue;
         }
@@ -146,7 +146,7 @@ export async function processNewCalls(userId: string, apiKey: string) {
         // Skip if transcript is too short to be meaningful
         if (!call.transcript || call.transcript.trim().length < 15) {
             console.log(`[Processor] Skipping short/empty transcript for ${call.call_id}`);
-            await Call.updateOne({ call_id: call.call_id }, { $set: { processed: true } });
+            await Call.updateOne({ call_id: call.call_id, userId }, { $set: { processed: true } });
             continue;
         }
 
@@ -171,14 +171,23 @@ export async function processNewCalls(userId: string, apiKey: string) {
         }
 
         try {
-            // Update Call with Analysis
+            // Update Call with Analysis — scoped to this user
+            let callStatus = "queries";
+            if (analysis) {
+                if (analysis.booking?.is_booked || analysis.intent === "booked") callStatus = "booked";
+                else if (analysis.intent === "not_interested") callStatus = "not_interested";
+                else if (analysis.intent === "interested") callStatus = "interested";
+                else if (analysis.intent === "follow_up") callStatus = "follow_up";
+            }
+
             await Call.updateOne(
-                { call_id: call.call_id },
+                { call_id: call.call_id, userId },
                 {
                     $set: {
                         llm_analysis: analysis,
                         processed: true, // Always mark as processed to stop retries
                         raw_llm_output: analysis ? null : raw,
+                        status: callStatus,
                     },
                 }
             );
@@ -186,8 +195,8 @@ export async function processNewCalls(userId: string, apiKey: string) {
             // Update Contact with Summary/Intent
             if (call.caller_number && analysis) {
                 let status = "fresh";
-                if (analysis.booking?.is_booked) status = "purchased";
-                else if (analysis.intent === "booked") status = "purchased";
+                if (analysis.booking?.is_booked) status = "booked";
+                else if (analysis.intent === "booked") status = "booked";
                 else if (analysis.intent === "interested") status = "interested";
                 else if (analysis.intent === "follow_up") status = "follow_up";
                 else if (analysis.intent === "not_interested") status = "not_interested";
@@ -213,12 +222,12 @@ export async function processNewCalls(userId: string, apiKey: string) {
                 // We only want to set the name if the LLM actually found a real name.
                 // If the LLM returned a placeholder or 'Bolna Lead', we skip setting it 
                 // on the contact if it's not a real improvement.
-                let shouldUpdateContactName = !!analysis.contact_name;
-                if (analysis.contact_name && analysis.contact_name.toLowerCase().includes('bolna lead')) {
+                let shouldUpdateContactName = !!analysis.customer_name;
+                if (analysis.customer_name && analysis.customer_name.toLowerCase().includes('bolna lead')) {
                     shouldUpdateContactName = false;
                 }
                 if (shouldUpdateContactName) {
-                    updateOps.$set.name = analysis.contact_name;
+                    updateOps.$set.name = analysis.customer_name;
                 }
 
                 const normalizedContactPhone = normalizePhone(call.caller_number);
@@ -235,10 +244,9 @@ export async function processNewCalls(userId: string, apiKey: string) {
                     );
                 } catch (dupErr: any) {
                     if (dupErr.code === 11000) {
-                        // Contact already exists with this phone (possibly under different userId due to indexing)
-                        // Fall back to just updating it by phone
+                        // Contact already exists with this phone for this user — update it
                         await Contact.findOneAndUpdate(
-                            { phone: normalizedContactPhone },
+                            { userId, phone: normalizedContactPhone },
                             updateOps
                         );
                     } else {
@@ -266,8 +274,8 @@ export async function processNewCalls(userId: string, apiKey: string) {
 
                     // Smart name update logic for Customer
                     let shouldUpdateCustomerName = false;
-                    if (analysis.contact_name) {
-                        const isLlmNamePlaceholder = analysis.contact_name.toLowerCase().includes('bolna lead');
+                    if (analysis.customer_name) {
+                        const isLlmNamePlaceholder = analysis.customer_name.toLowerCase().includes('bolna lead');
                         if (!existingCustomer) {
                             shouldUpdateCustomerName = true;
                         } else {
@@ -287,15 +295,19 @@ export async function processNewCalls(userId: string, apiKey: string) {
                     }
 
                     if (shouldUpdateCustomerName) {
-                        customerUpdateOps.$set.name = analysis.contact_name;
+                        customerUpdateOps.$set.name = analysis.customer_name;
                     }
 
                     // Add summary to pastConversations if present
-                    if (analysis.summary) {
+                    if (analysis.summary || analysis.summary_en) {
                         customerUpdateOps.$push = {
                             pastConversations: {
                                 date: new Date(call.call_timestamp),
-                                summary: analysis.summary,
+                                summary: analysis.summary || analysis.summary_en,
+                                summary_en: analysis.summary_en || analysis.summary,
+                                summary_hi: analysis.summary_hi || "",
+                                next_step: analysis.next_step || "",
+                                sentiment: analysis.sentiment || "",
                                 notes: call.transcript || "No transcript available",
                             }
                         };

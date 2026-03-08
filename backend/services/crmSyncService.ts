@@ -62,11 +62,19 @@ export async function syncBolnaToCrm(user: IUser) {
                     const conversationEntry = {
                         date: new Date(execution.created_at),
                         summary: execution.extracted_data?.summary || `Call with ${agent.agent_name}`,
+                        summary_en: execution.extracted_data?.summary_en,
+                        summary_hi: execution.extracted_data?.summary_hi,
+                        next_step: execution.extracted_data?.next_step,
+                        sentiment: execution.extracted_data?.sentiment,
                         notes: execution.transcript || "No transcript available",
                     };
 
                     // Upsert into CRM Customer
                     const normalizedNum = normalizePhone(phoneNumber);
+
+                    const callDirection = telephony.call_type === "inbound" || telephony.call_type === "outbound"
+                        ? telephony.call_type
+                        : "unknown";
 
                     // We use findOneAndUpdate with upsert to be atomic and avoid E11000
                     const updateData: any = {
@@ -88,6 +96,10 @@ export async function syncBolnaToCrm(user: IUser) {
                                 updateData.status = "booked";
                             }
 
+                            if (callDirection !== "unknown" && !existing.callDirections.includes(callDirection)) {
+                                updateData.callDirections = [...existing.callDirections, callDirection];
+                            }
+
                             // Preserve existing name if Bolna couldn't extract a real one
                             if (name === "Bolna Lead" && existing.name && existing.name !== "Bolna Lead") {
                                 delete updateData.name;
@@ -104,14 +116,16 @@ export async function syncBolnaToCrm(user: IUser) {
                                 totalUpdated++;
                             }
 
-                            await Customer.updateOne({ _id: existing._id }, updateQuery);
+                            await Customer.updateOne({ _id: existing._id, userId: user._id }, updateQuery);
                         } else {
                             // Create new
+                            const callDirectionsArray = callDirection !== "unknown" ? [callDirection] : [];
                             await Customer.create({
                                 userId: user._id,
                                 name: name,
                                 phoneNumber: normalizedNum,
                                 status: status,
+                                callDirections: callDirectionsArray,
                                 pastConversations: conversationEntry.notes !== "No transcript available" ? [conversationEntry] : [],
                                 createdAt: new Date(execution.created_at),
                             });

@@ -1,0 +1,45 @@
+# LLM Upgrade & Customer List Enhancements
+
+This walkthrough documents the successfully implemented upgrades to the LLM analysis pipeline and the customer management interface.
+
+## 1. LLM Analysis Upgrade (Phase 2)
+The AI analysis now provides more granular insights, including multi-language summaries and actionable next steps.
+
+### Backend Changes
+- **llm.service.ts**: Updated the system prompt to require `summary_en`, `summary_hi`, `next_step`, and `sentiment`.
+- **models/Customer.ts & models/Call.ts**: Extended schemas to store these new fields persistently.
+- **callProcessor.ts**: Refined the processing logic to populate these fields into the database immediately after a call is analyzed.
+
+### Frontend Enhancements
+A new multi-language toggle and detailed analysis sections have been added to:
+- **Call Summary Modal** (Customers List)
+- **Call Details Modal** (Analytics)
+- **AI Bookings Page**
+
+#### [VIEW] Hindi Toggle & New Fields
+The AI Summary section now includes a toggle to switch between English and Hindi, along with "Next Step" and "Sentiment" indicators.
+
+## 2. Sorting: Latest First (Phase 3)
+Customer and booking lists now prioritize the most recent data.
+
+- **CRM Routes**: The `/api/crm` endpoint now sorts customers by `createdAt` in descending order.
+- **Call Processor Routes**: The `/api/call-bookings` and `/api/processed-calls` endpoints sort by `created_at` descending.
+- **Immediate Visibility**: New customers or calls processed by the AI will appear at the very top of the lists without requiring manual sorting.
+
+## 3. Booking List Filter (Phase 4)
+The AI Bookings page is now focused exclusively on high-value leads.
+
+- **Status Filtering**: The `/api/call-bookings` route now strictly filters for `status: "booked"`.
+- **Backend-Driven**: Filtering is handled at the database level for optimal performance and data consistency.
+- **Empty State**: Added a clear "No booked customers yet" message when the list is empty.
+
+## 4. CRM Sync Alignment
+The [crmSyncService.ts](file:///d:/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/backend/services/crmSyncService.ts) was updated to ensure that when syncing executions from the Bolna platform, all new LLM metadata (summaries, next steps, sentiment) is preserved in the local CRM history.
+
+---
+**Verification Summary**:
+- [x] LLM prompt returns valid JSON with new fields.
+- [x] Database stores `summary_hi`, `next_step`, and `sentiment`.
+- [x] Frontend toggle correctly switches between `summary_en` and `summary_hi`.
+- [x] Customer list shows newest entries at the top.
+- [x] Bookings list shows only "booked" status calls.

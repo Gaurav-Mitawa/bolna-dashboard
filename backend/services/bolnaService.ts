@@ -53,6 +53,7 @@ export async function validateApiKey(rawApiKey: string): Promise<boolean> {
 // Fetch all agents for this user's Bolna account
 export async function getAgents(user: IUser): Promise<any[]> {
   const apiKey = getApiKey(user);
+  console.log(`[Bolna] Fetching agents for userId=${user._id}`);
   const response = await axios.get(`${BOLNA_HOST}/v2/agent/all`, {
     headers: { Authorization: `Bearer ${apiKey}` },
     timeout: 15000,

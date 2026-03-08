@@ -315,6 +315,22 @@ router.get(
         } catch (err: any) {
             res.status(500).json({ error: err.message });
         }
+ * Check processing status of a specific call — scoped to current user.
+ */
+router.get("/internal/call-status/:call_id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+        const userId = req.tenantId;
+        const doc = await Call.findOne({ call_id: req.params.call_id, userId }).lean();
+        if (!doc) return res.status(404).json({ exists: false });
+        res.json({
+            exists: true,
+            processed: doc.processed,
+            intent: doc.llm_analysis?.intent || null,
+            is_booked: doc.llm_analysis?.booking?.is_booked || false,
+            call_direction: doc.call_direction || "unknown",
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
     }
 );
 

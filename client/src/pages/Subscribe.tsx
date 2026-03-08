@@ -29,6 +29,9 @@ function loadRazorpay(): Promise<boolean> {
 export default function SubscribePage() {
   const { user, refetchUser } = useAuth();
   const [processing, setProcessing] = useState(false);
+  const [showCouponInput, setShowCouponInput] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponError, setCouponError] = useState("");
 
   const BASE_PRICE = 3499;
 
@@ -214,28 +217,103 @@ export default function SubscribePage() {
               )}
             </Button>
 
-            {/* 7-Day Free Trial — only if API key is set and never used a trial */}
+            {/* Free Trial — only if API key is set and never used a trial */}
             {user?.bolnaKeySet && !user?.trialStartedAt && !isSubscribed && (
               <div className="pt-4 border-t border-gray-100">
+                {/* Coupon Code Section */}
+                <div className="mb-4">
+                  {!showCouponInput ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCouponInput(true)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium underline"
+                    >
+                      Have a coupon code?
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Coupon Code
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponCode}
+                          onChange={(e) => {
+                            setCouponCode(e.target.value.toUpperCase());
+                            setCouponError("");
+                          }}
+                          placeholder="Enter code"
+                          className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                            couponError
+                              ? "border-red-500 focus:ring-red-500"
+                              : "border-gray-300 focus:ring-blue-500"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCouponInput(false);
+                            setCouponCode("");
+                            setCouponError("");
+                          }}
+                          className="px-3 py-2 text-gray-500 hover:text-gray-700 text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {couponError && (
+                        <p className="text-red-600 text-sm">{couponError}</p>
+                      )}
+                      {couponCode && !couponError && (
+                        <p className="text-green-600 text-sm">
+                          ✓ Code will be applied on trial start
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <Button
                   variant="outline"
                   className="w-full h-11 text-base font-semibold border-green-400 text-green-700 hover:bg-green-50"
                   onClick={async () => {
                     try {
                       setProcessing(true);
+                      setCouponError("");
+
                       const res = await fetch("/api/subscribe/start-trial", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         credentials: "include",
+                        body: JSON.stringify({
+                          couponCode: couponCode.trim() || undefined,
+                        }),
                       });
+
                       const data = await res.json();
+
                       if (!res.ok) {
-                        toast.error(data.error || "Could not start trial");
+                        // Handle coupon-specific errors
+                        if (data.field === "couponCode") {
+                          setCouponError(data.message);
+                          setProcessing(false);
+                          return;
+                        }
+                        toast.error(data.message || data.error || "Could not start trial");
+                        setProcessing(false);
                         return;
                       }
-                      toast.success("7-day free trial activated!");
+
+                      // Show success message
+                      if (data.couponApplied) {
+                        toast.success("30-day trial started with coupon code!");
+                      } else {
+                        toast.success("7-day free trial activated!");
+                      }
+
                       await refetchUser();
-                      window.location.href = data.redirect || "/dashboard";
+                      window.location.href = "/dashboard";
                     } catch {
                       toast.error("Network error. Please try again.");
                     } finally {
@@ -250,11 +328,11 @@ export default function SubscribePage() {
                       Starting Trial...
                     </>
                   ) : (
-                    "Start 7-Day Free Trial"
+                    `Start ${couponCode.trim() ? "30" : "7"}-Day Free Trial`
                   )}
                 </Button>
                 <p className="text-xs text-gray-400 text-center mt-2">
-                  No credit card required. Full access for 7 days.
+                  No credit card required. Full access for {couponCode.trim() ? "30" : "7"} days.
                 </p>
               </div>
             )}

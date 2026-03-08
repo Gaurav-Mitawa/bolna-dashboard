@@ -17,8 +17,8 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     const skip = (page - 1) * limit;
 
     const [total, campaigns] = await Promise.all([
-      Campaign.countDocuments({ userId: user._id }),
-      Campaign.find({ userId: user._id })
+      Campaign.countDocuments({ userId: req.tenantId }),
+      Campaign.find({ userId: req.tenantId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -49,7 +49,7 @@ router.get("/preview", isAuthenticated, isSubscribed, async (req: Request, res: 
 
     const user = req.user as any;
     const customers = await Customer.find(
-      { userId: user._id, status },
+      { userId: req.tenantId, status },
       "name phoneNumber status pastConversations"
     );
     res.json({ count: customers.length, customers });
@@ -72,7 +72,7 @@ router.get(
           .json({ error: "status query param is required" });
 
       const user = req.user as any;
-      const customers = await Customer.find({ userId: user._id, status });
+      const customers = await Customer.find({ userId: req.tenantId, status });
       if (customers.length === 0) {
         return res
           .status(404)
@@ -112,7 +112,7 @@ router.post(
 
       const user = req.user as any;
       const customers = await Customer.find({
-        userId: user._id,
+        userId: req.tenantId,
         status: targetStatus,
       });
 
@@ -152,7 +152,7 @@ router.post(
 
       // Save campaign to DB as draft
       const campaign = await Campaign.create({
-        userId: user._id,
+        userId: req.tenantId,
         agentId,
         batchId: batchResult.batch_id || batchResult.id,
         name: campaignName,
@@ -198,7 +198,7 @@ router.post(
       const user = req.user as any;
       const campaign = await Campaign.findOne({
         _id: req.params.id,
-        userId: user._id,
+        userId: req.tenantId,
       });
 
       if (!campaign) {
@@ -254,7 +254,7 @@ router.post(
       const user = req.user as any;
       const campaign = await Campaign.findOne({
         _id: req.params.id,
-        userId: user._id,
+        userId: req.tenantId,
       });
 
       if (!campaign) {
@@ -289,7 +289,7 @@ router.post(
         // Force a sync of the remote status and return success if we updated it.
         try {
           const user = req.user as any;
-          const campaign = await Campaign.findOne({ _id: req.params.id, userId: user._id });
+          const campaign = await Campaign.findOne({ _id: req.params.id, userId: req.tenantId });
           if (campaign && campaign.batchId) {
             const bolnaStatus = await bolnaService.getBatchStatus(user, campaign.batchId);
             const statusMap: Record<string, string> = {
@@ -337,7 +337,7 @@ router.get(
       const user = req.user as any;
       const campaign = await Campaign.findOne({
         _id: req.params.id,
-        userId: user._id,
+        userId: req.tenantId,
       });
       if (!campaign)
         return res.status(404).json({ error: "Campaign not found" });
@@ -377,7 +377,7 @@ router.get(
       const user = req.user as any;
       const campaign = await Campaign.findOne({
         _id: req.params.id,
-        userId: user._id,
+        userId: req.tenantId,
       });
       if (!campaign)
         return res.status(404).json({ error: "Campaign not found" });
@@ -403,7 +403,7 @@ router.delete(
       const user = req.user as any;
       const campaign = await Campaign.findOneAndDelete({
         _id: req.params.id,
-        userId: user._id,
+        userId: req.tenantId,
       });
 
       if (!campaign) {
@@ -414,6 +414,49 @@ router.delete(
     } catch (err: any) {
       console.error("Campaign delete error:", err);
       res.status(500).json({ error: `Backend Crash: ${err.stack || err.message}` });
+    }
+  }
+);
+
+// Helper function to format relative time
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+}
+
+// GET /api/campaigns/batch/:batchId/status — Get batch status from Bolna
+router.get(
+  "/batch/:batchId/status",
+  isAuthenticated,
+  isSubscribed,
+  hasBolnaKey,
+  async (req: Request, res: Response) => {
+    try {
+      const { batchId } = req.params;
+      const user = req.user as any;
+      
+      // Fetch batch status from Bolna API
+      const batchData = await bolnaService.getBatchStatus(user, batchId);
+      
+      // Transform to include humanized_created_at
+      const humanizedData = {
+        ...batchData,
+        humanized_created_at: formatRelativeTime(batchData.created_at),
+      };
+      
+      res.json(humanizedData);
+    } catch (error: any) {
+      console.error("Error fetching batch status:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch batch status" });
     }
   }
 );

@@ -49,11 +49,15 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     const skip = (page - 1) * limit;
 
     const user = req.user as any;
-    const filter: any = { userId: user._id };
+    const filter: any = { userId: req.tenantId };
 
     const allowedStatuses = ["fresh", "interested", "not_interested", "booked", "NA", "queries"];
     if (req.query.status && allowedStatuses.includes(req.query.status as string)) {
       filter.status = req.query.status;
+    }
+
+    if (req.query.direction === "inbound" || req.query.direction === "outbound") {
+      filter.callDirections = req.query.direction;
     }
 
     if (req.query.search) {
@@ -67,7 +71,7 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select("name phoneNumber email status createdAt updatedAt pastConversations"),
+        .select("name phoneNumber email status createdAt updatedAt pastConversations callDirections"),
     ]);
 
     res.json({
@@ -91,7 +95,7 @@ router.get("/stats", isAuthenticated, isSubscribed, async (req: Request, res: Re
   try {
     const user = req.user as any;
     const stats = await Customer.aggregate([
-      { $match: { userId: user._id, isDeleted: false } },
+      { $match: { userId: req.tenantId, isDeleted: false } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
 
@@ -122,7 +126,7 @@ router.post(
   generalLimiter,
   async (req: Request, res: Response) => {
     try {
-      const { name, phoneNumber, email, status } = req.body;
+      const { name, phoneNumber, email, status, callDirections } = req.body;
       if (!name || !phoneNumber) {
         return res.status(400).json({ message: "Name and phone number are required" });
       }
@@ -137,11 +141,12 @@ router.post(
 
       const user = req.user as any;
       const customer = await Customer.create({
-        userId: user._id,
+        userId: req.tenantId,
         name: name.trim(),
         phoneNumber: phoneNumber.trim(),
         email: (email || "").trim(),
         status: status || "fresh",
+        callDirections: callDirections || [],
       });
       res.status(201).json({ message: "Lead added successfully", customer });
     } catch (err: any) {
@@ -201,7 +206,7 @@ router.post(
         }
 
         processed.push({
-          userId: user._id,
+          userId: req.tenantId,
           name: row.name.trim(),
           phoneNumber: phone,
           email: (row.email || "").trim(),
@@ -249,7 +254,7 @@ router.post(
 // PUT /api/crm/:id — update lead
 router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
   try {
-    const { name, phoneNumber, email, status, conversationNote } = req.body;
+    const { name, phoneNumber, email, status, conversationNote, callDirections } = req.body;
     const user = req.user as any;
 
     // Validate phone if being changed
@@ -265,6 +270,7 @@ router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Resp
     if (phoneNumber !== undefined) update.phoneNumber = phoneNumber.trim();
     if (email !== undefined) update.email = email.trim();
     if (status !== undefined) update.status = status;
+    if (callDirections !== undefined) update.callDirections = callDirections;
     update.updatedAt = new Date();
 
     if (conversationNote) {
@@ -278,7 +284,7 @@ router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Resp
     }
 
     const customer = await Customer.findOneAndUpdate(
-      { _id: req.params.id, userId: user._id },
+      { _id: req.params.id, userId: req.tenantId },
       update,
       { new: true, runValidators: true }
     );
@@ -298,7 +304,7 @@ router.delete("/:id", isAuthenticated, isSubscribed, async (req: Request, res: R
   try {
     const user = req.user as any;
     const deleted = await Customer.findOneAndDelete(
-      { _id: req.params.id, userId: user._id }
+      { _id: req.params.id, userId: req.tenantId }
     );
 
     if (!deleted) return res.status(404).json({ message: "Lead not found" });

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Megaphone, RefreshCw, PlusCircle, Loader2, Play, Square, ChevronLeft, ChevronRight, AlertTriangle, Trash2 } from "lucide-react";
+import { Megaphone, RefreshCw, PlusCircle, Loader2, Play, Square, ChevronLeft, ChevronRight, AlertTriangle, Trash2, Activity } from "lucide-react";
 import { CreateCampaignModal } from "@/components/campaigns/CreateCampaignModal";
 import { ScheduleCampaignDialog } from "@/components/campaigns/ScheduleCampaignDialog";
+import { ViewStatusModal } from "@/components/campaigns/ViewStatusModal";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,15 +32,6 @@ interface PaginationData {
   totalPages: number;
 }
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-gray-100 text-gray-700" },
-  scheduled: { label: "Scheduled", className: "bg-blue-100 text-blue-700" },
-  running: { label: "Running", className: "bg-orange-100 text-orange-700" },
-  completed: { label: "Completed", className: "bg-green-100 text-green-700" },
-  failed: { label: "Failed", className: "bg-red-100 text-red-700" },
-  stopped: { label: "Stopped", className: "bg-red-50 text-red-600 border border-red-200" },
-};
-
 function formatDate(dateString: string) {
   if (!dateString) return "—";
   return new Date(dateString).toLocaleDateString("en-US", {
@@ -67,6 +59,7 @@ export default function CampaignsPage() {
   const [page, setPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [scheduleDialogData, setScheduleDialogData] = useState<{ id: string; name: string } | null>(null);
+  const [viewStatusModal, setViewStatusModal] = useState<BackendCampaign | null>(null);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -283,7 +276,6 @@ export default function CampaignsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {campaigns.map((campaign) => {
-                    const sc = statusConfig[campaign.status] || statusConfig.draft;
                     const isStopping = stoppingId === campaign._id;
                     const canStop = campaign.status === "scheduled" || campaign.status === "running";
 
@@ -306,7 +298,21 @@ export default function CampaignsPage() {
                           <span className="text-sm text-gray-700">{campaign.leadCount}</span>
                         </td>
                         <td className="px-4 py-4">
-                          <Badge className={cn("text-xs", sc.className)}>{sc.label}</Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setViewStatusModal(campaign)}
+                            disabled={!campaign.batchId}
+                            className={cn(
+                              "gap-1.5 h-8 px-3 font-medium transition-all",
+                              campaign.batchId
+                                ? "text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
+                                : "text-gray-400 border-gray-200 cursor-not-allowed"
+                            )}
+                          >
+                            <Activity className="h-3.5 w-3.5" />
+                            View Status
+                          </Button>
                         </td>
                         <td className="px-4 py-4">
                           <span className="text-sm text-gray-500">
@@ -445,6 +451,13 @@ export default function CampaignsPage() {
         onOpenChange={(open) => !open && setScheduleDialogData(null)}
         campaignName={scheduleDialogData?.name || ""}
         onSchedule={handleSchedule}
+      />
+
+      {/* View Status Modal */}
+      <ViewStatusModal
+        batchId={viewStatusModal?.batchId || ""}
+        open={!!viewStatusModal}
+        onOpenChange={(open) => !open && setViewStatusModal(null)}
       />
     </div>
   );

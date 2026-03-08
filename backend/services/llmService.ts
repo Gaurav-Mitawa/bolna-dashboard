@@ -5,9 +5,13 @@
  */
 
 export interface LLMAnalysis {
-    summary: string;
+    summary: string; // Mirror of summary_en for legacy compatibility
+    summary_en: string;
+    summary_hi: string;
     intent: string;
-    contact_name: string | null;
+    next_step: string;
+    sentiment: string;
+    customer_name: string | null;
     call_direction: string;
     booking: {
         is_booked: boolean;
@@ -17,30 +21,25 @@ export interface LLMAnalysis {
     };
 }
 
-const SYSTEM_PROMPT = `You are an AI assistant that analyzes call transcripts.
-Given the transcript below, return ONLY a valid JSON object with exactly these fields:
+const SYSTEM_PROMPT = `You are a voice call analyst AI. Analyze the call transcript and return ONLY a valid JSON object — no markdown, no code blocks, no explanation.
 
-{
-  "summary": "2-3 sentence summary of the call",
-  "intent": "one of: queries / booked / interested / not_interested / follow_up",
-  "contact_name": "extracted name of the person from the transcript, or null if not explicitly mentioned",
-  "call_direction": "inbound or outbound - infer from who initiated the conversation and context",
-  "booking": {
-    "is_booked": true or false,
-    "date": "YYYY-MM-DD or null if not booked",
-    "time": "HH:MM AM/PM or null if not booked",
-    "raw_datetime_string": "what the caller actually said, or null"
-  }
-}
+Field Rules:
+1 — summary_en: A concise English summary of the call (3-4 sentences).
+2 — summary_hi: The same summary translated into Hindi (Devanagari script).
+3 — summary: Duplicate of summary_en (required for legacy compatibility).
+4 — next_step: A single actionable task that should follow this call.
+5 — sentiment: Exactly one of: positive / neutral / negative
+6 — customer_name: The name of the customer if mentioned, otherwise null.
+7 — call_direction: inbound or outbound based on the dialogue.
+8 — intent: exactly one of: queries / booked / not_interested
+9 — booking: An object containing { is_booked: boolean, date: YYYY-MM-DD or null, time: HH:MM or null, raw_datetime_string: string or null }
 
-Intent classification rules:
-- "booked": The caller confirmed a booking, appointment, reservation, or scheduled something.
-- "interested": The caller verbally indicated strong interest, asked for quotes, next steps, or requested a callback, but did not commit to a specific booking date/time yet.
-- "follow_up": The caller requested to be contacted again, asked for a follow-up call, or the agent promised to call back at a later time.
-- "not_interested": The caller explicitly declined, refused, said no thanks, or expressed disinterest.
-- "queries": Everything else — general questions, inquiries, information requests.
+Intent Rules:
+- booked: Customer confirmed a booking/appointment.
+- not_interested: Customer explicitly said no or expressed disinterest.
+- queries: Everything else (questions, feedback, general talk).
 
-Return ONLY the JSON. No explanation. No markdown. No extra text.`;
+Return ONLY the JSON.`;
 
 export async function analyzeTranscript(
     transcript: string
@@ -106,6 +105,22 @@ export async function analyzeTranscript(
     try {
         const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
         const analysis: LLMAnalysis = JSON.parse(cleaned);
+
+        // Ensure mirroring if LLM missed it
+        if (analysis.summary_en && !analysis.summary) {
+            analysis.summary = analysis.summary_en;
+        } else if (analysis.summary && !analysis.summary_en) {
+            analysis.summary_en = analysis.summary;
+        }
+
+        // Defaults for required fields
+        if (!analysis.sentiment || !["positive", "neutral", "negative"].includes(analysis.sentiment)) {
+            analysis.sentiment = "neutral";
+        }
+        if (!analysis.call_direction || !["inbound", "outbound"].includes(analysis.call_direction)) {
+            analysis.call_direction = "outbound";
+        }
+
         return { analysis, raw };
     } catch {
         console.error("[LLM] Failed to parse JSON:", raw);

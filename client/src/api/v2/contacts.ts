@@ -13,6 +13,10 @@ export interface CallHistoryItem {
   type: 'inbound' | 'outbound';
   intent?: string;
   summary: string;
+  summary_en?: string;
+  summary_hi?: string;
+  next_step?: string;
+  sentiment?: "positive" | "neutral" | "negative";
   recording_url?: string;
   cost?: number;
   agent_name?: string;
