@@ -7,7 +7,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { agentApi, executionsApi, BolnaExecution } from "@/lib/bolnaApi";
 import { callProcessorApi } from "@/api/callProcessorApi";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +29,17 @@ import {
 } from "@/components/dashboard/DateFilter";
 import { DonutCard } from "@/components/dashboard/shared/DonutCard";
 import { cn } from "@/lib/utils";
+
+interface BolnaExecution {
+  id: string;
+  agent_id: string;
+  status: string;
+  created_at: string;
+  transcript?: string | null;
+  extracted_data?: Record<string, any> | null;
+  llm_analysis?: any | null;
+  telephony_data?: { call_type?: string } | null;
+}
 
 const COLORS = {
   blue: "#3B82F6",
@@ -115,35 +125,26 @@ export default function Dashboard() {
     staleTime: 60_000,
   });
 
-  // Fetch Bolna executions for donut charts
-  const { data: agents, isLoading: agentsLoading } = useQuery({
-    queryKey: ["agents"],
-    queryFn: () => agentApi.getAll(),
-  });
-
+  // Fetch call executions for donut charts — from MongoDB, scoped to authenticated user
   const { data: processedCalls = [] } = useQuery({
     queryKey: ["processedCalls"],
     queryFn: () => callProcessorApi.getProcessedCalls(),
   });
 
-  const { data: executions = [], isLoading: executionsLoading } = useQuery({
-    queryKey: ["executions", agents?.map((a) => a.id), dateRange],
+  const { data: executionsData = { data: [] }, isLoading: executionsLoading } = useQuery({
+    queryKey: ["dashboard-executions", dateRange],
     queryFn: async () => {
-      if (!agents || agents.length === 0) return [];
-
-      const allExecutions = await Promise.all(
-        agents.slice(0, 10).map((agent) =>
-          executionsApi.getByAgent(agent.id, {
-            page_size: 100,
-            from: dateRange.start.toISOString(),
-            to: dateRange.end.toISOString(),
-          })
-        )
-      );
-      return allExecutions.flatMap((r) => r.data || []);
+      const params = new URLSearchParams({
+        page_size: "500",
+        from: dateRange.start.toISOString(),
+        to: dateRange.end.toISOString(),
+      });
+      const res = await fetch(`/api/call-history?${params}`, { credentials: "include" });
+      if (!res.ok) return { data: [] };
+      return res.json();
     },
-    enabled: !!agents && agents.length > 0,
   });
+  const executions: BolnaExecution[] = (executionsData as any).data ?? [];
 
   const llmIntentMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -153,7 +154,7 @@ export default function Dashboard() {
     return map;
   }, [processedCalls]);
 
-  const isLoading = agentsLoading || executionsLoading;
+  const isLoading = executionsLoading;
 
   const filteredExecutions = useMemo(() => {
     return executions.filter((e: any) => {

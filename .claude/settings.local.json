@@ -6,7 +6,9 @@
       "Bash(wc -l \"/d/Autonoetic_edge/BOLNA-clusterx/BOLNA/bolna main/backend/routes\"/*.ts)",
       "mcp__Claude_Preview__preview_start",
       "Bash(where npx)",
-      "Bash(where node)"
+      "Bash(where node)",
+      "Bash(node --import tsx/esm server/index.ts)",
+      "Bash(curl -s http://localhost:5000/api/health)"
     ]
   }
 }

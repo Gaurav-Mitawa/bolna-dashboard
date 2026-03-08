@@ -33,7 +33,6 @@ import webhookRoutes from "./routes/webhookRoutes.js";
 import demoRoutes from "./routes/demoRoutes.js";
 import { attachTenantContext } from "./middleware/tenantContext.js";
 
-
 const app = express();
 const httpServer = createServer(app);
 const PORT = parseInt(process.env.PORT || "5000", 10);
