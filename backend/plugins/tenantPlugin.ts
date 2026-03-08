@@ -116,7 +116,7 @@ export function tenantPlugin(schema: Schema): void {
 
     // ─── Save middleware: ensure new documents have userId set ────────────────
 
-    (schema as any).pre("save", function (this: any, next: Function) {
+    (schema as any).pre("save", async function (this: any) {
         if (!this[TENANT_FIELD]) {
             const mode = getEnforcementMode();
             const collectionName = this.constructor?.modelName || "unknown";
@@ -130,14 +130,12 @@ export function tenantPlugin(schema: Schema): void {
             });
 
             if (mode === "strict") {
-                return next(
-                    new Error(
-                        `[TenantPlugin] STRICT MODE: Cannot save document to "${collectionName}" without userId.`
-                    )
+                throw new Error(
+                    `[TenantPlugin] STRICT MODE: Cannot save document to "${collectionName}" without userId.`
                 );
             }
         }
-        next();
+        // Mongoose 8: async pre-save hook — no next() call needed
     });
 
     // ─── insertMany middleware ────────────────────────────────────────────────
