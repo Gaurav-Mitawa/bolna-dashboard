@@ -57,6 +57,10 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
       filter.status = req.query.status;
     }
 
+    if (req.query.direction === "inbound" || req.query.direction === "outbound") {
+      filter.callDirections = req.query.direction;
+    }
+
     if (req.query.search) {
       const searchRegex = new RegExp((req.query.search as string).trim(), "i");
       filter.$or = [{ name: searchRegex }, { phoneNumber: searchRegex }];
@@ -68,7 +72,7 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select("name phoneNumber email status createdAt updatedAt pastConversations"),
+        .select("name phoneNumber email status createdAt updatedAt pastConversations callDirections"),
     ]);
 
     res.json({
@@ -123,7 +127,7 @@ router.post(
   generalLimiter,
   async (req: Request, res: Response) => {
     try {
-      const { name, phoneNumber, email, status } = req.body;
+      const { name, phoneNumber, email, status, callDirections } = req.body;
       if (!name || !phoneNumber) {
         return res.status(400).json({ message: "Name and phone number are required" });
       }
@@ -143,6 +147,7 @@ router.post(
         phoneNumber: phoneNumber.trim(),
         email: (email || "").trim(),
         status: status || "fresh",
+        callDirections: callDirections || [],
       });
       res.status(201).json({ message: "Lead added successfully", customer });
     } catch (err: any) {
@@ -250,7 +255,7 @@ router.post(
 // PUT /api/crm/:id — update lead
 router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
   try {
-    const { name, phoneNumber, email, status, conversationNote } = req.body;
+    const { name, phoneNumber, email, status, conversationNote, callDirections } = req.body;
     const user = req.user as any;
 
     // Validate phone if being changed
@@ -266,6 +271,7 @@ router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Resp
     if (phoneNumber !== undefined) update.phoneNumber = phoneNumber.trim();
     if (email !== undefined) update.email = email.trim();
     if (status !== undefined) update.status = status;
+    if (callDirections !== undefined) update.callDirections = callDirections;
     update.updatedAt = new Date();
 
     if (conversationNote) {

@@ -72,6 +72,10 @@ export async function syncBolnaToCrm(user: IUser) {
                     // Upsert into CRM Customer
                     const normalizedNum = normalizePhone(phoneNumber);
 
+                    const callDirection = telephony.call_type === "inbound" || telephony.call_type === "outbound"
+                        ? telephony.call_type
+                        : "unknown";
+
                     // We use findOneAndUpdate with upsert to be atomic and avoid E11000
                     const updateData: any = {
                         name: name, // Update name if it changed
@@ -90,6 +94,10 @@ export async function syncBolnaToCrm(user: IUser) {
                                 updateData.status = status;
                             } else if (status === "booked") {
                                 updateData.status = "booked";
+                            }
+
+                            if (callDirection !== "unknown" && !existing.callDirections.includes(callDirection)) {
+                                updateData.callDirections = [...existing.callDirections, callDirection];
                             }
 
                             // Preserve existing name if Bolna couldn't extract a real one
@@ -111,11 +119,13 @@ export async function syncBolnaToCrm(user: IUser) {
                             await Customer.updateOne({ _id: existing._id, userId: user._id }, updateQuery);
                         } else {
                             // Create new
+                            const callDirectionsArray = callDirection !== "unknown" ? [callDirection] : [];
                             await Customer.create({
                                 userId: user._id,
                                 name: name,
                                 phoneNumber: normalizedNum,
                                 status: status,
+                                callDirections: callDirectionsArray,
                                 pastConversations: conversationEntry.notes !== "No transcript available" ? [conversationEntry] : [],
                                 createdAt: new Date(execution.created_at),
                             });

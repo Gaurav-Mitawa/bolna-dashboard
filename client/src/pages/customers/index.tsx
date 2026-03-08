@@ -36,6 +36,7 @@ export default function CustomersIndexPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [directionFilter, setDirectionFilter] = useState<"all" | "inbound" | "outbound">("all");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   const [selectedContact, setSelectedContact] = useState<CrmCustomer | null>(null);
@@ -53,13 +54,14 @@ export default function CustomersIndexPage() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["crm-customers", page, search, statusFilter],
+    queryKey: ["crm-customers", page, search, statusFilter, directionFilter],
     queryFn: () =>
       crmApi.getAll({
         page,
         limit: PAGE_SIZE,
         search: search || undefined,
         status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+        direction: directionFilter !== "all" ? directionFilter : undefined,
       }),
     staleTime: 0,
   });
@@ -188,6 +190,110 @@ export default function CustomersIndexPage() {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Direction Filter Pills */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant={directionFilter === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setDirectionFilter("all");
+            setPage(1);
+          }}
+          className={cn(
+            "h-8 text-sm",
+            directionFilter === "all"
+              ? "bg-blue-600 hover:bg-blue-700 text-white"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          )}
+        >
+          All
+        </Button>
+        <Button
+          variant={directionFilter === "inbound" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setDirectionFilter("inbound");
+            setPage(1);
+          }}
+          className={cn(
+            "h-8 text-sm",
+            directionFilter === "inbound"
+              ? "bg-green-600 hover:bg-green-700 text-white"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          )}
+        >
+          Inbound
+        </Button>
+        <Button
+          variant={directionFilter === "outbound" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setDirectionFilter("outbound");
+            setPage(1);
+          }}
+          className={cn(
+            "h-8 text-sm",
+            directionFilter === "outbound"
+              ? "bg-purple-600 hover:bg-purple-700 text-white"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          )}
+        >
+          Outbound
+        </Button>
+      </div>
+
+      {/* Direction Filter Pills */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant={directionFilter === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setDirectionFilter("all");
+            setPage(1);
+          }}
+          className={cn(
+            "h-8 text-sm",
+            directionFilter === "all"
+              ? "bg-blue-600 hover:bg-blue-700 text-white"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          )}
+        >
+          All
+        </Button>
+        <Button
+          variant={directionFilter === "inbound" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setDirectionFilter("inbound");
+            setPage(1);
+          }}
+          className={cn(
+            "h-8 text-sm",
+            directionFilter === "inbound"
+              ? "bg-green-600 hover:bg-green-700 text-white"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          )}
+        >
+          Inbound
+        </Button>
+        <Button
+          variant={directionFilter === "outbound" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setDirectionFilter("outbound");
+            setPage(1);
+          }}
+          className={cn(
+            "h-8 text-sm",
+            directionFilter === "outbound"
+              ? "bg-purple-600 hover:bg-purple-700 text-white"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          )}
+        >
+          Outbound
+        </Button>
       </div>
 
       {/* Search & Filters */}

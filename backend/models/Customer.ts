@@ -20,6 +20,7 @@ export interface ICustomer extends Document {
   email: string;
   status: CustomerStatus;
   pastConversations: IPastConversation[];
+  callDirections: ("inbound" | "outbound")[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -59,6 +60,7 @@ const customerSchema = new Schema<ICustomer>(
       default: "fresh",
     },
     pastConversations: { type: [pastConversationSchema], default: [] },
+    callDirections: { type: [String], enum: ["inbound", "outbound"], default: [] },
   },
   { timestamps: true }
 );
@@ -68,6 +70,8 @@ customerSchema.index({ userId: 1, phoneNumber: 1 }, { unique: true });
 // Query performance indexes
 customerSchema.index({ userId: 1, status: 1 });
 customerSchema.index({ userId: 1, createdAt: -1 });
+customerSchema.index({ userId: 1, callDirections: 1 });
+customerSchema.index({ userId: 1, callDirections: 1 });
 
 // Apply tenant isolation plugin
 customerSchema.plugin(tenantPlugin);
