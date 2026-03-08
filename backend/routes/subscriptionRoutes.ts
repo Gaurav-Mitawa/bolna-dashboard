@@ -106,7 +106,7 @@ router.post("/verify-payment", isAuthenticated, async (req: Request, res: Respon
   }
 });
 
-// POST /api/subscribe/start-trial — Free trial for new users (7 or 30 days with coupon)
+// POST /api/subscribe/start-trial — Free trial start (7 days) or extend with coupon (30 days)
 router.post("/start-trial", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req.user as any)._id;
@@ -120,6 +120,16 @@ router.post("/start-trial", isAuthenticated, async (req: Request, res: Response)
     // Must have API key configured first
     if (!user.bolnaApiKey) {
       return res.status(400).json({ message: "Please set up your API key first." });
+    }
+
+    // Reject if coupon already applied — one coupon per account
+    if (user.couponApplied) {
+      return res.status(400).json({ message: "A coupon has already been applied to your account." });
+    }
+
+    // If trial already started and no coupon provided, block (trial already running)
+    if (user.trialStartedAt && (!couponCode || !couponCode.trim())) {
+      return res.status(400).json({ message: "Your trial is already active. Enter a coupon code to extend it." });
     }
 
     // Determine trial duration
@@ -144,16 +154,38 @@ router.post("/start-trial", isAuthenticated, async (req: Request, res: Response)
       appliedCoupon = coupon.code;
     }
 
-    // Calculate trial end date
+    // Case A: Trial already started → extend from original trialStartedAt (keep start date)
+    if (user.trialStartedAt && appliedCoupon) {
+      const extendedEnd = new Date(user.trialStartedAt);
+      extendedEnd.setDate(extendedEnd.getDate() + trialDays);
+
+      user.trialExpiresAt = extendedEnd;
+      user.trialEndDate = extendedEnd;
+      user.couponApplied = appliedCoupon;
+      // trialStartedAt is intentionally NOT reset — keep the original start date
+
+      await user.save();
+
+      console.log(
+        `[Subscription] Trial extended to ${trialDays} days for user: ${userId} with coupon: ${appliedCoupon}. New expiry: ${extendedEnd}`
+      );
+
+      return res.json({
+        message: `Trial extended to ${trialDays} days`,
+        trialExpiresAt: extendedEnd,
+        couponApplied: true,
+      });
+    }
+
+    // Case B: No trial yet → start fresh trial
     const now = new Date();
     const trialEnd = new Date(now);
     trialEnd.setDate(trialEnd.getDate() + trialDays);
 
-    // Update user with trial info
     user.subscriptionStatus = "trial";
     user.trialStartedAt = now;
-    user.trialExpiresAt = trialEnd; // Keep for backward compatibility
-    user.trialEndDate = trialEnd; // Primary field
+    user.trialExpiresAt = trialEnd;
+    user.trialEndDate = trialEnd;
     user.couponApplied = appliedCoupon;
 
     await user.save();

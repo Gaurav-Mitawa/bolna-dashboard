@@ -217,8 +217,8 @@ export default function SubscribePage() {
               )}
             </Button>
 
-            {/* Free Trial — only if API key is set and never used a trial */}
-            {user?.bolnaKeySet && !user?.trialStartedAt && !isSubscribed && (
+            {/* Free Trial / Coupon — visible if API key is set, no coupon applied yet, and not a paid subscriber */}
+            {user?.bolnaKeySet && !user?.couponApplied && !isSubscribed && (
               <div className="pt-4 border-t border-gray-100">
                 {/* Coupon Code Section */}
                 <div className="mb-4">
@@ -307,7 +307,9 @@ export default function SubscribePage() {
 
                       // Show success message
                       if (data.couponApplied) {
-                        toast.success("30-day trial started with coupon code!");
+                        toast.success(user?.trialStartedAt
+                          ? "Trial extended to 30 days with coupon!"
+                          : "30-day trial started with coupon code!");
                       } else {
                         toast.success("7-day free trial activated!");
                       }
@@ -328,11 +330,16 @@ export default function SubscribePage() {
                       Starting Trial...
                     </>
                   ) : (
-                    `Start ${couponCode.trim() ? "30" : "7"}-Day Free Trial`
+                    user?.trialStartedAt
+                      ? `Extend Trial to 30 Days`
+                      : `Start ${couponCode.trim() ? "30" : "7"}-Day Free Trial`
                   )}
                 </Button>
                 <p className="text-xs text-gray-400 text-center mt-2">
-                  No credit card required. Full access for {couponCode.trim() ? "30" : "7"} days.
+                  No credit card required.{" "}
+                  {user?.trialStartedAt
+                    ? "Extends your trial to 30 days from the start date."
+                    : `Full access for ${couponCode.trim() ? "30" : "7"} days.`}
                 </p>
               </div>
             )}

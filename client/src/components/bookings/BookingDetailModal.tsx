@@ -146,12 +146,17 @@ export function BookingDetailModal({ open, onOpenChange, booking }: BookingDetai
             />
             <InfoRow
               icon={<Calendar className="h-4 w-4 text-gray-400" />}
-              label="Date"
+              label="Call Date"
+              value={formatDate(booking.call_date || booking.service_date_raw)}
+            />
+            <InfoRow
+              icon={<Calendar className="h-4 w-4 text-orange-400" />}
+              label="Booking Date"
               value={formatDate(booking.service_date)}
             />
             <InfoRow
               icon={<Clock className="h-4 w-4 text-gray-400" />}
-              label="Time"
+              label="Booking Time"
               value={booking.service_time || "—"}
             />
             <InfoRow
