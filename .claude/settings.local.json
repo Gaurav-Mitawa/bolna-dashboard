@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(wc -l \"/d/Autonoetic_edge/BOLNA-clusterx/BOLNA/bolna main/backend/routes\"/*.ts)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npx)",
+      "Bash(where node)",
+      "Bash(ls /d/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/competent-ishizaka/*.json)",
+      "Bash(ln -s /d/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/jolly-tharp/node_modules /d/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/competent-ishizaka/node_modules)",
+      "Bash(node_modules/.bin/vite --port 5175)"
     ]
   }
 }

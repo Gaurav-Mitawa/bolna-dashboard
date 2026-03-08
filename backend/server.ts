@@ -15,6 +15,8 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 import { connectDB } from "./db.js";
 import { startAutoPolling } from "./services/scheduler.js";
+// Ensure Agent model is registered with Mongoose before poller runs
+import "./models/Agent.js";
 
 // Route imports
 import authRoutes from "./routes/authRoutes.js";
