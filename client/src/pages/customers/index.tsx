@@ -192,118 +192,14 @@ export default function CustomersIndexPage() {
         </div>
       </div>
 
-      {/* Direction Filter Pills */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant={directionFilter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setDirectionFilter("all");
-            setPage(1);
-          }}
-          className={cn(
-            "h-8 text-sm",
-            directionFilter === "all"
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-          )}
-        >
-          All
-        </Button>
-        <Button
-          variant={directionFilter === "inbound" ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setDirectionFilter("inbound");
-            setPage(1);
-          }}
-          className={cn(
-            "h-8 text-sm",
-            directionFilter === "inbound"
-              ? "bg-green-600 hover:bg-green-700 text-white"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-          )}
-        >
-          Inbound
-        </Button>
-        <Button
-          variant={directionFilter === "outbound" ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setDirectionFilter("outbound");
-            setPage(1);
-          }}
-          className={cn(
-            "h-8 text-sm",
-            directionFilter === "outbound"
-              ? "bg-purple-600 hover:bg-purple-700 text-white"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-          )}
-        >
-          Outbound
-        </Button>
-      </div>
-
-      {/* Direction Filter Pills */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant={directionFilter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setDirectionFilter("all");
-            setPage(1);
-          }}
-          className={cn(
-            "h-8 text-sm",
-            directionFilter === "all"
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-          )}
-        >
-          All
-        </Button>
-        <Button
-          variant={directionFilter === "inbound" ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setDirectionFilter("inbound");
-            setPage(1);
-          }}
-          className={cn(
-            "h-8 text-sm",
-            directionFilter === "inbound"
-              ? "bg-green-600 hover:bg-green-700 text-white"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-          )}
-        >
-          Inbound
-        </Button>
-        <Button
-          variant={directionFilter === "outbound" ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setDirectionFilter("outbound");
-            setPage(1);
-          }}
-          className={cn(
-            "h-8 text-sm",
-            directionFilter === "outbound"
-              ? "bg-purple-600 hover:bg-purple-700 text-white"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-          )}
-        >
-          Outbound
-        </Button>
-      </div>
-
       {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search by name or phone..."
-              className="pl-9 bg-gray-50 text-sm h-9 border-gray-200"
+              className="pl-9 bg-gray-50 text-sm h-10 border-gray-200 focus:ring-blue-500"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -312,8 +208,29 @@ export default function CustomersIndexPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-400" />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 px-3 h-10 bg-gray-50 border border-gray-200 rounded-md">
+              <Filter className="h-4 w-4 text-gray-400" />
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Filters:</span>
+            </div>
+
+            <Select
+              value={directionFilter}
+              onValueChange={(v: any) => {
+                setDirectionFilter(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-10 w-[140px] text-sm border-gray-200 focus:ring-blue-500 bg-white shadow-sm">
+                <SelectValue placeholder="Call Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="inbound">Inbound</SelectItem>
+                <SelectItem value="outbound">Outbound</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Select
               value={statusFilter}
               onValueChange={(v) => {
@@ -321,8 +238,8 @@ export default function CustomersIndexPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9 w-[160px] text-sm border-gray-200 focus:ring-blue-500">
-                <SelectValue placeholder="Status Filter" />
+              <SelectTrigger className="h-10 w-[160px] text-sm border-gray-200 focus:ring-blue-500 bg-white shadow-sm">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
@@ -337,92 +254,99 @@ export default function CustomersIndexPage() {
           </div>
         </div>
 
-        <div className="text-xs sm:text-sm text-gray-500 font-medium">
-          {totalCount} total customers
+        <div className="text-sm text-gray-500 font-semibold px-4 py-2 bg-gray-50 rounded-lg border border-gray-100 whitespace-nowrap">
+          {totalCount} total leads
         </div>
       </div>
 
+
       {/* Error Display */}
-      {queryError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-          <p className="text-red-700 font-medium text-sm">Error loading customers</p>
-          <p className="text-red-600 text-xs">{(queryError as Error).message}</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={refreshData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </div>
-      )}
+      {
+        queryError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+            <p className="text-red-700 font-medium text-sm">Error loading customers</p>
+            <p className="text-red-600 text-xs">{(queryError as Error).message}</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={refreshData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        )
+      }
 
       {/* Table */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20 bg-white border border-gray-100 rounded-xl">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        </div>
-      ) : customers.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-16 text-center shadow-sm">
-          <div className="h-16 w-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Users className="h-8 w-8 text-gray-300" />
+      {
+        isLoading ? (
+          <div className="flex items-center justify-center py-20 bg-white border border-gray-100 rounded-xl">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            No leads found
-          </h3>
-          <p className="text-gray-500 mb-6 max-w-sm mx-auto text-sm">
-            {search || statusFilter !== "all"
-              ? "We couldn't find any leads matching your current filters. Try resetting them."
-              : "Your lead pipeline is empty. Start by adding a single lead or uploading a CSV file."}
-          </p>
-          <div className="flex items-center justify-center gap-3">
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" /> Add Lead
-            </Button>
-            <Button variant="outline" onClick={() => setIsBulkUploadModalOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" /> Bulk Upload
-            </Button>
+        ) : customers.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-16 text-center shadow-sm">
+            <div className="h-16 w-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="h-8 w-8 text-gray-300" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No leads found
+            </h3>
+            <p className="text-gray-500 mb-6 max-w-sm mx-auto text-sm">
+              {search || statusFilter !== "all"
+                ? "We couldn't find any leads matching your current filters. Try resetting them."
+                : "Your lead pipeline is empty. Start by adding a single lead or uploading a CSV file."}
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsAddModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Add Lead
+              </Button>
+              <Button variant="outline" onClick={() => setIsBulkUploadModalOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" /> Bulk Upload
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <CustomersTable
-          data={customers}
-          onView={handleViewContact}
-          onEdit={handleEditContact}
-          onDelete={handleDeleteContact}
-        />
-      )}
+        ) : (
+          <CustomersTable
+            data={customers}
+            onView={handleViewContact}
+            onEdit={handleEditContact}
+            onDelete={handleDeleteContact}
+          />
+        )
+      }
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="text-gray-600 hover:bg-gray-50"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous
-          </Button>
-          <div className="flex items-center gap-2">
-            <span className="text-xs sm:text-sm font-medium text-gray-900 px-3 py-1 bg-gray-100 rounded-md">
-              {page}
-            </span>
-            <span className="text-xs sm:text-sm text-gray-400">
-              of {totalPages}
-            </span>
+      {
+        totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="text-gray-600 hover:bg-gray-50"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-medium text-gray-900 px-3 py-1 bg-gray-100 rounded-md">
+                {page}
+              </span>
+              <span className="text-xs sm:text-sm text-gray-400">
+                of {totalPages}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="text-gray-600 hover:bg-gray-50"
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="text-gray-600 hover:bg-gray-50"
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      )}
+        )
+      }
 
       {/* Modals */}
       <ContactDetailModal
@@ -449,6 +373,6 @@ export default function CustomersIndexPage() {
         onOpenChange={setIsEditModalOpen}
         onSuccess={() => refetch()}
       />
-    </div>
+    </div >
   );
 }

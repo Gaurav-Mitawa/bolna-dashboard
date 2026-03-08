@@ -1,9 +1,27 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { Contact } from "../models/Contact.js";
 import { Call } from "../models/Call.js";
 import { isAuthenticated } from "../middleware/auth.js";
+import multer from "multer";
+import { parse } from "csv-parse/sync";
+
+interface MulterRequest extends Request {
+    file?: Express.Multer.File;
+}
 
 const router = Router();
+
+// Configure multer for bulk upload
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+    fileFilter: (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+        if (file.mimetype !== "text/csv" && !file.originalname.endsWith(".csv")) {
+            return cb(new Error("Only CSV files are allowed"));
+        }
+        cb(null, true);
+    },
+});
 
 // Apply authentication to all routes
 router.use(isAuthenticated);
@@ -168,5 +186,100 @@ router.delete("/:id", async (req: Request, res: Response) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+/**
+ * POST /api/contacts/bulk-upload
+ * Handles CSV contact imports
+ */
+router.post(
+    "/bulk-upload",
+    (req: Request, res: Response, next: NextFunction) => {
+        upload.single("file")(req, res, (err: any) => {
+            if (err instanceof multer.MulterError) {
+                return res.status(400).json({ message: `File upload error: ${err.message}` });
+            } else if (err) {
+                return res.status(400).json({ message: err.message });
+            }
+            next();
+        });
+    },
+    async (req: Request, res: Response) => {
+        const mReq = req as MulterRequest;
+        try {
+            if (!mReq.file) return res.status(400).json({ message: "No file uploaded" });
+            if (!req.tenantId) {
+                return res.status(401).json({ message: "Tenant context missing" });
+            }
+
+            const rawRecords = parse(mReq.file.buffer.toString(), {
+                columns: true,
+                skip_empty_lines: true,
+                trim: true,
+            });
+
+            const processed: any[] = [];
+            const errors: any[] = [];
+
+            for (const row of rawRecords) {
+                let name = (row.name || "").trim();
+                let phone = (row.phone || row.phoneNumber || "").trim();
+                let email = (row.email || "").trim();
+
+                if (!name || !phone) {
+                    errors.push({ row: row.username || "Unknown", reason: "Missing name or phone" });
+                    continue;
+                }
+
+                processed.push({
+                    userId: req.tenantId,
+                    name,
+                    phone,
+                    email,
+                    tag: row.tag || "fresh",
+                    source: row.source || "csv",
+                });
+            }
+
+            // Remove duplicates within the batch
+            const seen = new Set();
+            const deduplicated = processed.filter(r => {
+                const key = `${r.phone}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+
+            let created = 0;
+            let skipped = 0;
+
+            if (deduplicated.length > 0) {
+                try {
+                    const result = await Contact.insertMany(deduplicated, { ordered: false });
+                    created = result.length;
+                } catch (bulkErr: any) {
+                    if (bulkErr.name === "BulkWriteError" || bulkErr.code === 11000) {
+                        created = bulkErr.result?.nInserted || 0;
+                        skipped = deduplicated.length - created;
+                    } else {
+                        throw bulkErr;
+                    }
+                }
+            }
+
+            res.json({
+                success: true,
+                data: {
+                    created,
+                    skipped,
+                    total: deduplicated.length,
+                    validationErrors: errors
+                }
+            });
+        } catch (err: any) {
+            console.error("[ContactRoutes] Bulk upload failure:", err);
+            res.status(500).json({ message: "Bulk upload failed", error: err.message });
+        }
+    }
+);
 
 export default router;

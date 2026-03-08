@@ -71,7 +71,6 @@ customerSchema.index({ userId: 1, phoneNumber: 1 }, { unique: true });
 customerSchema.index({ userId: 1, status: 1 });
 customerSchema.index({ userId: 1, createdAt: -1 });
 customerSchema.index({ userId: 1, callDirections: 1 });
-customerSchema.index({ userId: 1, callDirections: 1 });
 
 // Apply tenant isolation plugin
 customerSchema.plugin(tenantPlugin);

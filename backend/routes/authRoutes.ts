@@ -16,21 +16,17 @@ router.get(
   (req: Request, res: Response, next: any) => {
     passport.authenticate("google", (err: any, user: any, _info: any) => {
       if (err) {
-        // Log the real error so it's visible in server terminal
         console.error("[Auth] Google OAuth callback error:", err.message || err);
-        // Redirect with a meaningful error instead of a 500 crash
-        const msg = err.message?.includes("ECONNREFUSED") || err.message?.includes("connect")
-          ? "db_unavailable"
-          : "auth_error";
-        return res.redirect(`/login?error=${msg}`);
+        const detail = err.message ? encodeURIComponent(err.message) : "unknown";
+        return res.redirect(`/login?error=auth_error&detail=${detail}`);
       }
       if (!user) return res.redirect("/login?error=auth_failed");
 
-      // Manually log the user in (creates the session)
       req.logIn(user, (loginErr) => {
         if (loginErr) {
           console.error("[Auth] Session save error:", loginErr.message || loginErr);
-          return res.redirect("/login?error=session_error");
+          const detail = loginErr.message ? encodeURIComponent(loginErr.message) : "unknown";
+          return res.redirect(`/login?error=session_error&detail=${detail}`);
         }
         // Redirect based on account state
         if (!user.bolnaApiKey) return res.redirect("/setup-api");
