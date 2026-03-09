@@ -204,7 +204,7 @@ export default function CallHistoryPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-4">
         <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="All Agents" />
           </SelectTrigger>
           <SelectContent>
@@ -218,7 +218,7 @@ export default function CallHistoryPage() {
         </Select>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-full sm:w-[150px]">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
@@ -232,7 +232,7 @@ export default function CallHistoryPage() {
         </Select>
 
         <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-full sm:w-[150px]">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>

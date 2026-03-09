@@ -16,7 +16,7 @@ const schema = z.object({
     name: z.string().min(2, "Name is required"),
     phoneNumber: z.string().regex(/^\+?[1-9]\d{6,14}$/, "Use international format: +91XXXXXXXXXX"),
     email: z.string().email("Valid email required").or(z.literal("")),
-    status: z.enum(["fresh", "interested", "not_interested", "booked", "NA", "queries"]),
+    status: z.enum(["fresh", "interested", "not_interested", "booked", "NA", "queries", "follow_up", "sent_quotation"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -113,6 +113,8 @@ export function EditLeadModal({ open, onOpenChange, customer, onSuccess }: EditL
                                     <SelectItem value="booked">Booked</SelectItem>
                                     <SelectItem value="NA">NA</SelectItem>
                                     <SelectItem value="queries">Queries</SelectItem>
+                                    <SelectItem value="follow_up">Follow Up</SelectItem>
+                                    <SelectItem value="sent_quotation">Sent Quotation</SelectItem>
                                 </SelectContent>
                             </Select>
                             {errors.status && <p className="text-xs text-red-600">{errors.status.message}</p>}

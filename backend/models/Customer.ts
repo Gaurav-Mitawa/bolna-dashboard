@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Query } from "mongoose";
 import { tenantPlugin } from "../plugins/tenantPlugin.js";
 
-export type CustomerStatus = "fresh" | "interested" | "not_interested" | "booked" | "NA" | "queries";
+export type CustomerStatus = "fresh" | "interested" | "not_interested" | "booked" | "NA" | "queries" | "follow_up" | "sent_quotation";
 
 export interface IPastConversation {
   date: Date;
@@ -56,7 +56,7 @@ const customerSchema = new Schema<ICustomer>(
     email: { type: String, trim: true, lowercase: true, default: "" },
     status: {
       type: String,
-      enum: ["fresh", "interested", "not_interested", "booked", "NA", "queries"],
+      enum: ["fresh", "interested", "not_interested", "booked", "NA", "queries", "follow_up", "sent_quotation"],
       default: "fresh",
     },
     pastConversations: { type: [pastConversationSchema], default: [] },
