@@ -28,13 +28,14 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
       not_interested: 0,
       booked: 0,
       NA: 0,
+      queries: 0,
+      follow_up: 0,
+      sent_quotation: 0,
     };
     crmStats.forEach((s: any) => {
-      leads[s._id] = s.count;
+      if (s._id in leads) leads[s._id] = s.count;
     });
-    leads.total = Object.values(leads)
-      .slice(0, 5)
-      .reduce((a, b) => a + b, 0);
+    leads.total = Object.values(leads).reduce((a, b) => a + b, 0);
 
     // Campaign stats
     const [totalCampaigns, recentCampaigns] = await Promise.all([
