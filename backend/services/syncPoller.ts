@@ -256,7 +256,7 @@ async function syncCallsForAgent(
                 );
                 created++;
 
-                // Upsert Contact (fast, no LLM)
+                // Upsert Contact (fast, no LLM) — also tracks returning callers
                 if (callerNumber) {
                     const normalizedPhone = normalizePhone(callerNumber);
                     try {
@@ -271,16 +271,42 @@ async function syncCallsForAgent(
                                     tag: "fresh",
                                     source: direction === "outbound" ? "bolna_outbound" : "bolna_inbound",
                                     created_at: new Date(),
-                                    call_count: 0,
-                                    total_call_duration: 0,
                                 },
                                 $set: { updated_at: new Date() },
+                                $inc: {
+                                    call_count: 1,
+                                    total_call_duration: exec.conversation_time || 0,
+                                },
                             },
                             { upsert: true }
                         );
                     } catch (dupErr: any) {
                         if (dupErr.code !== 11000) {
                             console.error(`[SyncPoller][${runId}] Contact upsert error for ${callerNumber}:`, dupErr.message);
+                        }
+                    }
+
+                    // Upsert Customer — every call creates a Customer immediately, no LLM needed
+                    try {
+                        await Customer.findOneAndUpdate(
+                            { userId, phoneNumber: normalizedPhone },
+                            {
+                                $setOnInsert: {
+                                    name: `Contact ${normalizedPhone.slice(-4)}`,
+                                    email: "",
+                                    status: "fresh",
+                                    pastConversations: [],
+                                },
+                                $addToSet: {
+                                    callDirections: direction === "outbound" ? "outbound" : "inbound",
+                                },
+                                $set: { updatedAt: new Date() },
+                            },
+                            { upsert: true }
+                        );
+                    } catch (dupErr: any) {
+                        if (dupErr.code !== 11000) {
+                            console.error(`[SyncPoller][${runId}] Customer upsert error for ${callerNumber}:`, dupErr.message);
                         }
                     }
                 }
@@ -357,10 +383,6 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                         last_call_agent: call.agent_name,
                         updated_at: new Date(),
                     },
-                    $inc: {
-                        call_count: 1,
-                        total_call_duration: call.call_duration,
-                    },
                 };
                 if (status !== "fresh") contactUpdate.$set.tag = status;
                 if (analysis.contact_name && !analysis.contact_name.toLowerCase().includes("bolna lead")) {
@@ -378,6 +400,12 @@ async function runLlmAnalysis(runId: string): Promise<number> {
 
                 const customerUpdate: any = {
                     $set: { updatedAt: new Date() },
+                    $setOnInsert: {
+                        name: `Contact ${normalizedPhone.slice(-4)}`,
+                        email: "",
+                        status: "fresh",
+                        pastConversations: [],
+                    },
                 };
                 if (status !== "fresh") customerUpdate.$set.status = status;
                 if (analysis.summary) {
@@ -399,7 +427,8 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                 try {
                     await Customer.findOneAndUpdate(
                         { userId: call.userId, phoneNumber: normalizedPhone },
-                        customerUpdate
+                        customerUpdate,
+                        { upsert: true }
                     );
                 } catch (e: any) {
                     console.error(`[SyncPoller][${runId}] Customer update error:`, e.message);

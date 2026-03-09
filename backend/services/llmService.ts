@@ -11,7 +11,8 @@ export interface LLMAnalysis {
     intent: string;
     next_step: string;
     sentiment: string;
-    customer_name: string | null;
+    contact_name: string | null;
+    customer_name: string | null; // Legacy mirror of contact_name
     call_direction: string;
     booking: {
         is_booked: boolean;
@@ -29,7 +30,7 @@ Field Rules:
 3 — summary: Duplicate of summary_en (required for legacy compatibility).
 4 — next_step: A single actionable task that should follow this call.
 5 — sentiment: Exactly one of: positive / neutral / negative
-6 — customer_name: The name of the customer if mentioned, otherwise null.
+6 — contact_name: The name of the customer if mentioned, otherwise null.
 7 — call_direction: inbound or outbound based on the dialogue.
 8 — intent: exactly one of: queries / booked / not_interested
 9 — booking: An object containing { is_booked: boolean, date: YYYY-MM-DD or null, time: HH:MM or null, raw_datetime_string: string or null }
@@ -106,11 +107,20 @@ export async function analyzeTranscript(
         const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
         const analysis: LLMAnalysis = JSON.parse(cleaned);
 
-        // Ensure mirroring if LLM missed it
+        // --- Post-process Mirrors for Consistency ---
+
+        // Mirror summary fields
         if (analysis.summary_en && !analysis.summary) {
             analysis.summary = analysis.summary_en;
         } else if (analysis.summary && !analysis.summary_en) {
             analysis.summary_en = analysis.summary;
+        }
+
+        // Mirror name fields
+        if (analysis.contact_name && !analysis.customer_name) {
+            analysis.customer_name = analysis.contact_name;
+        } else if (analysis.customer_name && !analysis.contact_name) {
+            analysis.contact_name = analysis.customer_name;
         }
 
         // Defaults for required fields
