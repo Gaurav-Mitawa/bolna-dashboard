@@ -249,6 +249,8 @@ export default function CustomersIndexPage() {
                 <SelectItem value="not_interested">Not Interested</SelectItem>
                 <SelectItem value="booked">Booked</SelectItem>
                 <SelectItem value="queries">Queries</SelectItem>
+                <SelectItem value="follow_up">Follow Up</SelectItem>
+                <SelectItem value="sent_quotation">Sent Quotation</SelectItem>
                 <SelectItem value="NA">N/A</SelectItem>
               </SelectContent>
             </Select>

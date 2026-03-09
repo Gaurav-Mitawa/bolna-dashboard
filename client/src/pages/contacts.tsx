@@ -182,9 +182,9 @@ export default function ContactsPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4 rounded-xl">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+            <span className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
               <Users className="h-6 w-6" />
             </span>
             <div>
@@ -193,14 +193,14 @@ export default function ContactsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search guests..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-64 bg-gray-50"
+                className="pl-10 w-full bg-gray-50"
               />
             </div>
             <Button variant="outline" className="h-9 text-gray-700 gap-1">

@@ -27,11 +27,14 @@ interface ContactDetailModalProps {
 }
 
 const statusMap: Record<string, { label: string; className: string }> = {
-  fresh: { label: "Fresh", className: "bg-orange-100 text-orange-700 border-orange-200" },
-  interested: { label: "Interested", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  fresh:          { label: "Fresh",          className: "bg-orange-100 text-orange-700 border-orange-200" },
+  interested:     { label: "Interested",     className: "bg-blue-100 text-blue-700 border-blue-200" },
   not_interested: { label: "Not Interested", className: "bg-red-100 text-red-700 border-red-200" },
-  booked: { label: "Booked", className: "bg-green-100 text-green-700 border-green-200" },
-  NA: { label: "N/A", className: "bg-gray-100 text-gray-700 border-gray-200" },
+  booked:         { label: "Booked",         className: "bg-green-100 text-green-700 border-green-200" },
+  NA:             { label: "N/A",            className: "bg-gray-100 text-gray-700 border-gray-200" },
+  queries:        { label: "Queries",        className: "bg-purple-100 text-purple-700 border-purple-200" },
+  follow_up:      { label: "Follow Up",      className: "bg-sky-100 text-sky-700 border-sky-200" },
+  sent_quotation: { label: "Sent Quotation", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
 };
 
 function formatDate(dateString: string): string {
