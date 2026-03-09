@@ -59,6 +59,9 @@ interface DashboardSummary {
     not_interested: number;
     booked: number;
     NA: number;
+    queries: number;
+    follow_up: number;
+    sent_quotation: number;
     total: number;
   };
   campaigns: { total: number };

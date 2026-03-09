@@ -10,7 +10,11 @@
       "Bash(node --import tsx/esm server/index.ts)",
       "Bash(curl -s http://localhost:5000/api/health)",
       "Bash(ls \"D:\\\\Autonoetic_edge\\\\BOLNA-clusterx\\\\BOLNA\\\\client\\\\src\\\\pages\"\" 2>/dev/null || echo \"path not found \")",
-      "Bash(ls \"D:\\\\Autonoetic_edge\\\\BOLNA-clusterx\\\\BOLNA\\\\.claude\\\\worktrees\\\\competent-ishizaka\\\\client\\\\src\\\\pages\"\" 2>/dev/null || echo \"DIR_LISTING_FAILED \")"
+      "Bash(ls \"D:\\\\Autonoetic_edge\\\\BOLNA-clusterx\\\\BOLNA\\\\.claude\\\\worktrees\\\\competent-ishizaka\\\\client\\\\src\\\\pages\"\" 2>/dev/null || echo \"DIR_LISTING_FAILED \")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''exports'',{}\\), indent=2\\)\\)\")",
+      "Bash(node -e \"const p = require\\(''/d/Autonoetic_edge/BOLNA-clusterx/BOLNA/.claude/worktrees/hungry-swirles/node_modules/connect-mongo/package.json''\\); console.log\\(JSON.stringify\\(p.exports, null, 2\\)\\)\")",
+      "Bash(node -e \"const p = require\\(''D:\\\\\\\\Autonoetic_edge\\\\\\\\BOLNA-clusterx\\\\\\\\BOLNA\\\\\\\\.claude\\\\\\\\worktrees\\\\\\\\hungry-swirles\\\\\\\\node_modules\\\\\\\\connect-mongo\\\\\\\\package.json''\\); console.log\\(Object.keys\\(p.exports || {}\\).join\\('', ''\\)\\)\")",
+      "Bash(npm cache clean --force)"
     ]
   }
 }

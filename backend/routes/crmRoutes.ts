@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { Customer } from "../models/Customer.js";
+import { Call } from "../models/Call.js";
 import { isAuthenticated, isSubscribed } from "../middleware/auth.js";
 import { attachTenantContext } from "../middleware/tenantContext.js";
 import { runSyncPoller } from "../services/syncPoller.js";
@@ -80,8 +81,62 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
         .select("name phoneNumber email status createdAt updatedAt pastConversations callDirections"),
     ]);
 
+    // Enrich customers with data from latest processed Call (same source as /bookings).
+    // For customers with empty pastConversations or generic names, pull from Call.llm_analysis.
+    const phoneNumbers = customers.map((c) => c.phoneNumber);
+    const latestCallsRaw = await Call.aggregate([
+      {
+        $match: {
+          userId: req.tenantId,
+          caller_number: { $in: phoneNumbers },
+          processed: true,
+          llm_analysis: { $ne: null },
+        },
+      },
+      { $sort: { call_timestamp: -1 } },
+      {
+        $group: {
+          _id: "$caller_number",
+          latestCall: { $first: "$$ROOT" },
+        },
+      },
+    ]);
+
+    const callByPhone = new Map<string, any>();
+    latestCallsRaw.forEach(({ _id, latestCall }: any) =>
+      callByPhone.set(_id, latestCall)
+    );
+
+    const enriched = customers.map((c) => {
+      const obj = c.toObject();
+      const call = callByPhone.get(c.phoneNumber);
+      if (!call) return obj;
+
+      // Replace generic name if LLM extracted the real caller name
+      if (/^Contact \d+$/.test(obj.name) && call.llm_analysis?.customer_name) {
+        obj.name = call.llm_analysis.customer_name;
+      }
+
+      // Fill empty pastConversations from the latest Call's llm_analysis
+      if (obj.pastConversations.length === 0) {
+        obj.pastConversations = [
+          {
+            date: call.call_timestamp || call.created_at,
+            summary: call.llm_analysis.summary || "",
+            summary_en: call.llm_analysis.summary_en || "",
+            summary_hi: call.llm_analysis.summary_hi || "",
+            next_step: call.llm_analysis.next_step || "",
+            sentiment: call.llm_analysis.sentiment || "",
+            notes: call.transcript || "",
+          },
+        ];
+      }
+
+      return obj;
+    });
+
     res.json({
-      customers,
+      customers: enriched,
       pagination: {
         total,
         page,
