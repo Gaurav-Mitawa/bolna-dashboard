@@ -51,7 +51,7 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     const user = req.user as any;
     const filter: any = { userId: req.tenantId };
 
-    const allowedStatuses = ["fresh", "interested", "not_interested", "booked", "NA", "queries"];
+    const allowedStatuses = ["fresh", "interested", "not_interested", "booked", "NA", "queries", "follow_up", "sent_quotation"];
     if (req.query.status && allowedStatuses.includes(req.query.status as string)) {
       filter.status = req.query.status;
     }
@@ -106,6 +106,8 @@ router.get("/stats", isAuthenticated, isSubscribed, async (req: Request, res: Re
       booked: 0,
       NA: 0,
       queries: 0,
+      follow_up: 0,
+      sent_quotation: 0,
     };
     stats.forEach((s: any) => {
       if (s._id in result) result[s._id] = s.count;

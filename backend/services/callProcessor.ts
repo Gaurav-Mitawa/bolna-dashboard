@@ -222,12 +222,12 @@ export async function processNewCalls(userId: string, apiKey: string) {
                 // We only want to set the name if the LLM actually found a real name.
                 // If the LLM returned a placeholder or 'Bolna Lead', we skip setting it 
                 // on the contact if it's not a real improvement.
-                let shouldUpdateContactName = !!analysis.customer_name;
-                if (analysis.customer_name && analysis.customer_name.toLowerCase().includes('bolna lead')) {
+                let shouldUpdateContactName = !!analysis.contact_name;
+                if (analysis.contact_name && analysis.contact_name.toLowerCase().includes('bolna lead')) {
                     shouldUpdateContactName = false;
                 }
                 if (shouldUpdateContactName) {
-                    updateOps.$set.name = analysis.customer_name;
+                    updateOps.$set.name = analysis.contact_name;
                 }
 
                 const normalizedContactPhone = normalizePhone(call.caller_number);
@@ -274,8 +274,8 @@ export async function processNewCalls(userId: string, apiKey: string) {
 
                     // Smart name update logic for Customer
                     let shouldUpdateCustomerName = false;
-                    if (analysis.customer_name) {
-                        const isLlmNamePlaceholder = analysis.customer_name.toLowerCase().includes('bolna lead');
+                    if (analysis.contact_name) {
+                        const isLlmNamePlaceholder = analysis.contact_name.toLowerCase().includes('bolna lead');
                         if (!existingCustomer) {
                             shouldUpdateCustomerName = true;
                         } else {
@@ -295,7 +295,7 @@ export async function processNewCalls(userId: string, apiKey: string) {
                     }
 
                     if (shouldUpdateCustomerName) {
-                        customerUpdateOps.$set.name = analysis.customer_name;
+                        customerUpdateOps.$set.name = analysis.contact_name;
                     }
 
                     // Add summary to pastConversations if present

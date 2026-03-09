@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export type CustomerStatus = "fresh" | "interested" | "not_interested" | "booked" | "NA" | "queries";
+export type CustomerStatus = "fresh" | "interested" | "not_interested" | "booked" | "NA" | "queries" | "follow_up" | "sent_quotation";
 
 export interface IPastConversation {
   date: string;
@@ -41,6 +41,8 @@ export interface CrmStats {
   booked: number;
   NA: number;
   queries: number;
+  follow_up: number;
+  sent_quotation: number;
   total: number;
 }
 
