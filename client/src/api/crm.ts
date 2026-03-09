@@ -99,7 +99,15 @@ export const crmApi = {
     return res.data;
   },
 
-  syncBolna: async (): Promise<{ success: boolean; data: { processed: number; created: number; updated: number } }> => {
+  /** Phase 7 — send pre-normalized rows from frontend (no CSV re-parsing on server) */
+  bulkUploadRows: async (
+    rows: { name: string; phoneNumber: string; email: string; status: string }[]
+  ): Promise<{ inserted: number; skipped: number }> => {
+    const res = await axios.post(`${BASE}/bulk-json`, { rows });
+    return res.data;
+  },
+
+  syncBolna: async (): Promise<{ success: boolean; message: string }> => {
     const res = await axios.post(`${BASE}/sync-bolna`);
     return res.data;
   },

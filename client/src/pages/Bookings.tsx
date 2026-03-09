@@ -63,12 +63,14 @@ export default function BookingsPage() {
     );
   }, [allBookings, searchQuery]);
 
-  // Filter booked calls for calendar based on search
+  // Filter booked calls — only intent_category === "booked" (exclude "interested")
+  // Used for both Calendar view and List view so non-Booked entries don't appear
   const filteredBooked = useMemo(() => {
-    if (!searchQuery.trim()) return bookedCalls;
+    const onlyBooked = bookedCalls.filter((b) => b.intent_category === "booked");
+    if (!searchQuery.trim()) return onlyBooked;
 
     const query = searchQuery.toLowerCase();
-    return bookedCalls.filter((booking) =>
+    return onlyBooked.filter((booking) =>
       booking.contact_name?.toLowerCase().includes(query) ||
       booking.service_name.toLowerCase().includes(query) ||
       booking.caller_number?.toLowerCase().includes(query)
@@ -185,16 +187,16 @@ export default function BookingsPage() {
         />
       )}
 
-      {/* List View — Booked + Queries calls */}
+      {/* List View — Only "Booked" intent calls */}
       {!isLoading && viewMode === "list" && (
         <ListView
-          bookings={filteredBookings}
+          bookings={filteredBooked}
           onBookingClick={(booking) => setSelectedBooking(booking)}
         />
       )}
 
       {/* Empty State */}
-      {!isLoading && (viewMode === "calendar" ? filteredBooked : filteredBookings).length === 0 && (
+      {!isLoading && filteredBooked.length === 0 && (
         <div className="text-center py-12 sm:py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200 px-4">
           <CalendarDays className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
           <h3 className="text-base sm:text-lg font-medium text-gray-600 mb-1 sm:mb-2">No bookings found</h3>

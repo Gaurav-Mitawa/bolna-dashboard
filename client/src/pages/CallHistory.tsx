@@ -315,7 +315,7 @@ export default function CallHistoryPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(execution.telephony_data?.recording_url, '_blank')}
+                            onClick={() => window.open(execution.telephony_data?.recording_url ?? undefined, '_blank')}
                           >
                             <Play className="h-4 w-4" />
                           </Button>

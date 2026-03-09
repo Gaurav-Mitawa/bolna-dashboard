@@ -16,6 +16,7 @@ export interface SessionUser {
   isSubscriptionActive: boolean;
   trialExpiresAt: string | null;
   trialStartedAt: string | null;
+  couponApplied: string | null;
   // Legacy fields — kept for backwards compat with existing components
   wallet_balance?: number;
   wallet?: number;

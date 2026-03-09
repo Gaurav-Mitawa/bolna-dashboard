@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { Customer } from "../models/Customer.js";
 import { isAuthenticated, isSubscribed } from "../middleware/auth.js";
+import { attachTenantContext } from "../middleware/tenantContext.js";
 import { runSyncPoller } from "../services/syncPoller.js";
 import { generalLimiter } from "../middleware/rateLimiter.js";
 import multer from "multer";
@@ -11,6 +12,11 @@ interface MulterRequest extends Request {
 }
 
 const router = Router();
+
+// Apply tenant context at the router level so this file is self-sufficient.
+// Even if the parent server.ts forgets to apply tenantScoped, all CRM routes
+// still get req.tenantId set correctly from the authenticated session.
+router.use(isAuthenticated, attachTenantContext);
 
 // Configure multer for bulk upload
 const upload = multer({
@@ -186,19 +192,56 @@ router.post(
         trim: true,
       });
 
-      const phoneRegex = /^\+[1-9]\d{6,14}$/;
       const processed: any[] = [];
       const errors: any[] = [];
-      const user = req.user as any;
+
+      // Full normalizer — handles scientific notation, leading zeros, hyphens, 12-digit, etc.
+      const normalizePhone = (raw: string): string | null => {
+        let val = String(raw ?? "").trim();
+        if (!val) return null;
+        // Excel scientific notation (e.g. 9.17471E+11 → 917471000000)
+        if (/[eE]/.test(val) && /^\d/.test(val)) {
+          const num = Number(val);
+          if (!isNaN(num) && isFinite(num)) val = Math.round(num).toString();
+        }
+        // Strip hyphens, spaces, dots, parentheses
+        val = val.replace(/[\s\-\.\(\)]/g, "");
+        // Already correct Indian E.164 (+91XXXXXXXXXX starting 6-9)
+        if (/^\+91[6-9]\d{9}$/.test(val)) return val;
+        // Valid non-Indian E.164 (+1…, +44…, etc.)
+        if (/^\+[1-9]\d{6,14}$/.test(val) && !val.startsWith("+91")) return val;
+        // Has +91 prefix — check length and start digit
+        if (val.startsWith("+91")) {
+          const d = val.slice(3);
+          if (d.length === 10 && /^[6-9]/.test(d)) return "+91" + d;
+          return null;
+        }
+        // 12 digits: 91XXXXXXXXXX (no +)
+        if (/^91\d{10}$/.test(val)) {
+          const d = val.slice(2);
+          return /^[6-9]/.test(d) ? "+91" + d : null;
+        }
+        // 10-digit Indian number (no prefix)
+        if (/^\d{10}$/.test(val)) {
+          return /^[6-9]/.test(val) ? "+91" + val : null;
+        }
+        // Leading zero: 09876543210
+        if (/^0\d{10}$/.test(val)) {
+          const s = val.slice(1);
+          return /^[6-9]/.test(s) ? "+91" + s : null;
+        }
+        return null;
+      };
+
+      const VALID_STATUSES = ["fresh", "interested", "not_interested", "booked", "NA", "queries"];
 
       for (const row of rawRecords) {
-        let phone = (row.phoneNumber || row.phone || "").trim();
+        // Accept any common phone column header
+        const rawPhone = (row.phoneNumber || row.phone || row.mobile || row.contact || row.mob || "").trim();
+        const phone = normalizePhone(rawPhone);
 
-        // Auto-add +91 if number is 10 digits (Indian numbers)
-        if (/^\d{10}$/.test(phone)) phone = "+91" + phone;
-
-        if (!phone || !phoneRegex.test(phone)) {
-          errors.push({ row: row.name || "Unknown", reason: "Invalid phone number" });
+        if (!phone) {
+          errors.push({ row: row.name || rawPhone || "Unknown", reason: `Invalid phone: "${rawPhone}"` });
           continue;
         }
 
@@ -207,12 +250,14 @@ router.post(
           continue;
         }
 
+        const status = VALID_STATUSES.includes(row.status) ? row.status : "fresh";
+
         processed.push({
           userId: req.tenantId,
           name: row.name.trim(),
           phoneNumber: phone,
-          email: (row.email || "").trim(),
-          status: "fresh",
+          email: (row.email || "").trim().toLowerCase(),
+          status,
         });
       }
 
@@ -267,6 +312,54 @@ router.post(
     }
   }
 );
+
+// POST /api/crm/bulk-json — Phase 7: accept pre-normalized rows from the frontend
+// The frontend has already validated + normalized all phone numbers to E.164.
+// This endpoint simply inserts them and handles DB-level duplicates.
+router.post("/bulk-json", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ message: "No rows provided" });
+    }
+
+    const VALID_STATUSES = ["fresh", "interested", "not_interested", "booked", "NA", "queries"];
+
+    const docs = rows
+      .map((r: any) => ({
+        userId: req.tenantId,
+        name: String(r.name || "").trim(),
+        phoneNumber: String(r.phoneNumber || "").trim(),
+        email: String(r.email || "").trim().toLowerCase(),
+        status: VALID_STATUSES.includes(r.status) ? r.status : "fresh",
+      }))
+      .filter(d => d.name && d.phoneNumber);
+
+    if (docs.length === 0) {
+      return res.status(400).json({ message: "No valid rows after filtering" });
+    }
+
+    let insertedCount = 0;
+    let skippedCount  = 0;
+
+    try {
+      const result = await Customer.insertMany(docs, { ordered: false });
+      insertedCount = result.length;
+    } catch (bulkErr: any) {
+      if (bulkErr.code === 11000 || bulkErr.writeErrors) {
+        insertedCount = bulkErr.result?.nInserted ?? 0;
+        skippedCount  = docs.length - insertedCount;
+      } else {
+        throw bulkErr;
+      }
+    }
+
+    res.json({ inserted: insertedCount, skipped: skippedCount });
+  } catch (err: any) {
+    console.error("[CrmRoutes] bulk-json error:", err.message);
+    res.status(500).json({ message: err.message || "Bulk import failed" });
+  }
+});
 
 // PUT /api/crm/:id — update lead
 router.put("/:id", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {

@@ -42,7 +42,7 @@ interface SubscriptionInfo {
 }
 
 export default function BillingPage() {
-  const { refetchUser } = useAuth();
+  const { user, refetchUser } = useAuth();
 
   // Fetch subscription details from our backend
   const { data: subData } = useQuery<SubscriptionInfo>({
@@ -158,7 +158,7 @@ export default function BillingPage() {
                 <CardTitle className="text-base sm:text-lg">Subscription</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
                   {sub?.isTrial
-                    ? "7-Day Free Trial — ClusterX CRM"
+                    ? `${user?.couponApplied ? "30" : "7"}-Day Free Trial — ClusterX CRM`
                     : "Cluster X CRM — ₹3,499 / month"}
                 </CardDescription>
               </div>

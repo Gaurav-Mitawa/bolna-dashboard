@@ -72,6 +72,12 @@ router.get(
             if (req.query.call_type && req.query.call_type !== "all") {
                 filter.call_direction = req.query.call_type;
             }
+            if (req.query.from) {
+                filter.call_timestamp = { ...filter.call_timestamp, $gte: new Date(req.query.from as string) };
+            }
+            if (req.query.to) {
+                filter.call_timestamp = { ...filter.call_timestamp, $lte: new Date(req.query.to as string) };
+            }
 
             const [total, calls] = await Promise.all([
                 Call.countDocuments(filter),
@@ -148,7 +154,7 @@ router.get(
 
 /**
  * GET /api/call-bookings
- * Returns calls where LLM detected a booking or intent is "interested".
+ * Returns calls where LLM detected a booking (is_booked=true or intent="booked").
  * Always scoped to the authenticated user.
  */
 router.get(
@@ -163,7 +169,7 @@ router.get(
                 userId,
                 $or: [
                     { "llm_analysis.booking.is_booked": true },
-                    { "llm_analysis.intent": "interested" },
+                    { "llm_analysis.intent": "booked" },
                 ],
             };
 
@@ -291,31 +297,62 @@ router.get(
 );
 
 /**
- * GET /api/internal/call-status/:call_id
- * Processing status of a specific call. Scoped to authenticated user.
+ * PUT /api/call-bookings/:call_id
+ * Update LLM summary fields (English + Hindi) for a booking.
+ * Scoped to the authenticated user — only the owner can update.
  */
-router.get(
-    "/internal/call-status/:call_id",
+router.put(
+    "/call-bookings/:call_id",
     isAuthenticated,
+    isSubscribed,
     async (req: Request, res: Response) => {
         try {
             const userId = (req.user as any)._id.toString();
-            const doc = await Call.findOne({
-                call_id: req.params.call_id,
-                userId,
-            }).lean();
-            if (!doc) return res.status(404).json({ exists: false });
-            res.json({
-                exists: true,
-                processed: doc.processed,
-                intent: doc.llm_analysis?.intent || null,
-                is_booked: doc.llm_analysis?.booking?.is_booked || false,
-                call_direction: doc.call_direction || "unknown",
-            });
+            const { summary, summary_en, summary_hi } = req.body;
+
+            const update: any = {};
+            if (summary    !== undefined) update["llm_analysis.summary"]    = summary;
+            if (summary_en !== undefined) update["llm_analysis.summary_en"] = summary_en;
+            if (summary_hi !== undefined) update["llm_analysis.summary_hi"] = summary_hi;
+
+            if (Object.keys(update).length === 0) {
+                return res.status(400).json({ error: "No fields to update" });
+            }
+
+            const doc = await Call.findOneAndUpdate(
+                { call_id: req.params.call_id, userId },
+                { $set: update },
+                { new: true }
+            ).lean();
+
+            if (!doc) return res.status(404).json({ error: "Call not found" });
+            res.json({ success: true });
         } catch (err: any) {
+            console.error("[Route] PUT /call-bookings error:", err.message);
             res.status(500).json({ error: err.message });
         }
     }
 );
+
+/**
+ * GET /api/internal/call-status/:call_id
+ * Check processing status of a specific call — scoped to current user.
+ */
+router.get("/internal/call-status/:call_id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+        const userId = req.tenantId;
+        const doc = await Call.findOne({ call_id: req.params.call_id, userId }).lean();
+        if (!doc) return res.status(404).json({ exists: false });
+        res.json({
+            exists: true,
+            processed: doc.processed,
+            intent: doc.llm_analysis?.intent || null,
+            is_booked: doc.llm_analysis?.booking?.is_booked || false,
+            call_direction: doc.call_direction || "unknown",
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 export default router;

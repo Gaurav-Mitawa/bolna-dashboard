@@ -73,7 +73,8 @@ export default function CustomersIndexPage() {
   }, [contactsData, isLoading]);
 
   const customers = contactsData?.customers || [];
-  const totalCount = contactsData?.total || 0;
+  // Backend returns { customers, pagination: { total, ... } } — not top-level total
+  const totalCount = (contactsData as any)?.pagination?.total ?? customers.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const refreshData = async () => {
@@ -123,7 +124,7 @@ export default function CustomersIndexPage() {
     try {
       const result = await crmApi.syncBolna();
       if (result.success) {
-        toast.success(`Sync complete! Created: ${result.data.created}, Updated: ${result.data.updated}`, { id: toastId });
+        toast.success(result.message || "Sync started in background — data will update shortly", { id: toastId });
         refetch();
       } else {
         toast.error("Sync failed", { id: toastId });
