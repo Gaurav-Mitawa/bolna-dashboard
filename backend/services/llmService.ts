@@ -31,7 +31,7 @@ export interface LLMAnalysis {
 function buildSystemPrompt(today: string, tomorrow: string, dayAfterTomorrow: string): string {
     return `You are a voice call analyst AI. Analyze the call transcript and return ONLY a valid JSON object — no markdown, no code blocks, no explanation.
 
-Today's Date (IST): ${today}. Use this to resolve all relative date references in the transcript.
+Call Date (IST): ${today}. This is the date the call took place. Use this date to resolve ALL relative date references in the transcript (e.g. "kal"/"tomorrow" means the day after ${today}, "aaj"/"today" means ${today}).
 
 Relative Date Resolution:
 - "aaj" / "aaj ka din" / "today" → ${today}
@@ -69,7 +69,8 @@ Return ONLY the JSON.`;
 }
 
 export async function analyzeTranscript(
-    transcript: string
+    transcript: string,
+    callTimestamp?: string  // ISO date string of when the call happened (used as reference for "kal", "aaj", etc.)
 ): Promise<{ analysis: LLMAnalysis | null; raw: string }> {
     const grokKey = process.env.GROK_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
@@ -77,10 +78,14 @@ export async function analyzeTranscript(
     let apiKey = grokKey || geminiKey;
     if (!apiKey) throw new Error("No LLM API Key (GROK_API_KEY or GEMINI_API_KEY) found in .env");
 
-    // Compute today's date in IST (UTC+5:30) for relative date resolution
-    const nowUtc = new Date();
+    // Use the call's actual timestamp as the IST reference date.
+    // This ensures "kal" (tomorrow), "aaj" (today) etc. are resolved relative to
+    // when the CALL HAPPENED — not when the poller runs (which may be days later).
+    const referenceUtc = (callTimestamp && !isNaN(new Date(callTimestamp).getTime()))
+        ? new Date(callTimestamp)
+        : new Date();
     const istOffset = 5.5 * 60 * 60 * 1000;
-    const nowIst = new Date(nowUtc.getTime() + istOffset);
+    const nowIst = new Date(referenceUtc.getTime() + istOffset);
     const fmt = (d: Date): string => d.toISOString().split("T")[0];
     const todayStr = fmt(nowIst);
     const tomorrowDate = new Date(nowIst);

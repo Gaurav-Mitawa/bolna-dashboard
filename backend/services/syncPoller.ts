@@ -360,7 +360,8 @@ async function runLlmAnalysis(runId: string): Promise<number> {
 
         try {
             console.log(`[SyncPoller][${runId}] Analyzing call ${call.call_id}...`);
-            const result = await analyzeTranscript(call.transcript);
+            // Pass call_timestamp so LLM resolves "kal"/"aaj" relative to call date, not poller run date
+            const result = await analyzeTranscript(call.transcript, call.call_timestamp || undefined);
             const analysis = result.analysis;
 
             await Call.updateOne(
