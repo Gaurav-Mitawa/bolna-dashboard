@@ -1,9 +1,9 @@
 /**
  * Contact Detail Modal Component
- * Shows CRM customer details with pastConversations history
+ * Shows CRM customer details with full call history fetched from /api/crm/:id/calls
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +15,7 @@ import {
   Zap,
   MessageSquare,
   Clock,
-  ShoppingCart,
+  Mic,
 } from "lucide-react";
 import type { CrmCustomer } from "@/api/crm";
 import { cn } from "@/lib/utils";
@@ -68,11 +68,28 @@ export function ContactDetailModal({
   onOpenChange,
 }: ContactDetailModalProps) {
   const [activeTab, setActiveTab] = useState("history");
+  const [callHistory, setCallHistory] = useState<any[]>([]);
+  const [callsLoading, setCallsLoading] = useState(false);
+
+  // Fetch full call history from Call collection when modal opens
+  useEffect(() => {
+    if (!open || !contact?._id) {
+      setCallHistory([]);
+      return;
+    }
+    setCallsLoading(true);
+    fetch(`/api/crm/${contact._id}/calls`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setCallHistory(data.calls || []))
+      .catch(() => setCallHistory([]))
+      .finally(() => setCallsLoading(false));
+  }, [open, contact?._id]);
 
   if (!contact) return null;
 
   const statusConfig = statusMap[contact.status] || statusMap.fresh;
-  const conversations = contact.pastConversations || [];
+  // Latest call is first (API sorted DESC)
+  const latestCall = callHistory[0] ?? null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,7 +130,7 @@ export function ContactDetailModal({
                 className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-t-lg rounded-b-none gap-2 px-4 py-2"
               >
                 <FileText className="h-4 w-4" />
-                History ({conversations.length})
+                History ({callsLoading ? "…" : callHistory.length})
               </TabsTrigger>
               <TabsTrigger
                 value="action"
@@ -125,24 +142,28 @@ export function ContactDetailModal({
             </TabsList>
           </div>
 
-          {/* History Tab */}
+          {/* History Tab — all LLM-processed calls */}
           <TabsContent
             value="history"
             className="p-6 m-0 flex-1 overflow-y-auto max-h-[calc(90vh-280px)]"
           >
             <div className="space-y-4">
-              {conversations.length === 0 ? (
+              {callsLoading ? (
+                <div className="text-center py-16">
+                  <p className="text-gray-400 text-sm">Loading call history…</p>
+                </div>
+              ) : callHistory.length === 0 ? (
                 <div className="text-center py-16">
                   <MessageSquare className="h-16 w-16 text-gray-200 mx-auto mb-4" />
                   <p className="text-gray-500 font-medium mb-1">No Conversations Yet</p>
                   <p className="text-sm text-gray-400">
-                    Past conversation notes will appear here when added.
+                    Call history will appear here after calls are analysed.
                   </p>
                 </div>
               ) : (
-                [...conversations].reverse().map((conv, idx) => (
+                callHistory.map((call, idx) => (
                   <div
-                    key={idx}
+                    key={call.call_id || idx}
                     className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all"
                   >
                     <div className="flex items-start gap-4">
@@ -150,24 +171,64 @@ export function ContactDetailModal({
                         <MessageSquare className="h-5 w-5 text-orange-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
+                        {/* Direction + date row */}
+                        <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+                          <span className="text-xs text-gray-500 font-medium">
+                            {call.call_direction === "inbound" ? "📞 Inbound" : "📤 Outbound"}
+                            {call.call_duration ? ` · ${Math.round(call.call_duration)}s` : ""}
+                          </span>
                           <span className="text-xs text-gray-400 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {formatRelativeTime(conv.date)}
+                            {formatRelativeTime(call.call_timestamp)} · {formatDate(call.call_timestamp)}
                           </span>
-                          <span className="text-xs text-gray-500">{formatDate(conv.date)}</span>
                         </div>
-                        {conv.summary && (
+
+                        {/* Summary */}
+                        {call.llm_analysis?.summary && (
                           <p className="text-sm text-gray-700 leading-relaxed mb-2">
                             <span className="font-medium text-gray-900">Summary: </span>
-                            {conv.summary}
+                            {call.llm_analysis.summary}
                           </p>
                         )}
-                        {conv.notes && (
-                          <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
-                            <span className="font-medium text-gray-700">Notes: </span>
-                            {conv.notes}
+
+                        {/* Next Step */}
+                        {call.llm_analysis?.next_step && (
+                          <p className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1 mb-2">
+                            <span className="font-medium">Next Step: </span>
+                            {call.llm_analysis.next_step}
                           </p>
+                        )}
+
+                        {/* Sentiment + Recording */}
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          {call.llm_analysis?.sentiment && (
+                            <span className="text-xs text-gray-500 bg-gray-100 rounded px-2 py-0.5">
+                              Sentiment: {call.llm_analysis.sentiment}
+                            </span>
+                          )}
+                          {call.recording_url && (
+                            <a
+                              href={call.recording_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-orange-600 hover:underline inline-flex items-center gap-1"
+                            >
+                              <Mic className="h-3 w-3" />
+                              Listen to recording
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Transcript — collapsible */}
+                        {call.transcript && (
+                          <details className="mt-2">
+                            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">
+                              View transcript
+                            </summary>
+                            <p className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                              {call.transcript}
+                            </p>
+                          </details>
                         )}
                       </div>
                     </div>
@@ -183,6 +244,7 @@ export function ContactDetailModal({
             className="p-6 m-0 flex-1 overflow-y-auto max-h-[calc(90vh-280px)]"
           >
             <div className="space-y-6">
+              {/* Status + Total Calls */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
@@ -194,12 +256,15 @@ export function ContactDetailModal({
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    Conversations
+                    Total Calls
                   </p>
-                  <p className="text-2xl font-bold text-gray-900">{conversations.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {callsLoading ? "…" : callHistory.length}
+                  </p>
                 </div>
               </div>
 
+              {/* Contact Info */}
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
                   Contact Info
@@ -218,32 +283,57 @@ export function ContactDetailModal({
                 </div>
               </div>
 
-              {conversations.length > 0 && (
-                <div className="bg-orange-50 rounded-xl p-5 border border-orange-100">
-                  <h3 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-2">
+              {/* Latest Call Analysis — from Call collection via LLM */}
+              {latestCall?.llm_analysis && (
+                <div className="bg-orange-50 rounded-xl p-5 border border-orange-100 space-y-3">
+                  <h3 className="text-sm font-bold text-orange-800 flex items-center gap-2">
                     <Zap className="h-4 w-4" />
-                    Latest Conversation
+                    Latest Call Analysis
                   </h3>
-                  <div className="bg-white/80 rounded-lg p-4 border border-orange-100">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {conversations[conversations.length - 1].summary ||
-                        conversations[conversations.length - 1].notes ||
-                        "No details available."}
-                    </p>
-                    <p className="text-[10px] text-orange-600 mt-2 font-medium">
-                      {formatDate(conversations[conversations.length - 1].date)}
-                    </p>
+                  {latestCall.llm_analysis.summary && (
+                    <div className="bg-white/80 rounded-lg p-3 border border-orange-100">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Summary</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {latestCall.llm_analysis.summary}
+                      </p>
+                    </div>
+                  )}
+                  {latestCall.llm_analysis.next_step && (
+                    <div className="bg-white/80 rounded-lg p-3 border border-orange-100">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Next Step</p>
+                      <p className="text-sm text-gray-700">{latestCall.llm_analysis.next_step}</p>
+                    </div>
+                  )}
+                  <div className="flex gap-3 flex-wrap">
+                    {latestCall.llm_analysis.sentiment && (
+                      <span className="text-xs bg-white border border-orange-200 text-orange-700 rounded px-2 py-1">
+                        Sentiment: {latestCall.llm_analysis.sentiment}
+                      </span>
+                    )}
+                    {latestCall.recording_url && (
+                      <a
+                        href={latestCall.recording_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs bg-white border border-orange-200 text-orange-700 rounded px-2 py-1 hover:underline flex items-center gap-1"
+                      >
+                        <Mic className="h-3 w-3" /> Listen to Recording
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
 
-              <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 text-center">
-                <ShoppingCart className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-blue-900">Booking Integration</p>
-                <p className="text-xs text-blue-700 mt-1">
-                  Direct booking and PMS integration will be available here.
-                </p>
-              </div>
+              {/* Fallback when no calls yet */}
+              {!callsLoading && callHistory.length === 0 && (
+                <div className="bg-gray-50 rounded-xl p-5 border border-gray-100 text-center">
+                  <MessageSquare className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-gray-500">No calls analysed yet</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Call analysis details will appear here once a call is processed.
+                  </p>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
