@@ -107,17 +107,39 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
       callByPhone.set(_id, latestCall)
     );
 
+    // Same intent→status mapping as syncPoller Phase 3
+    const intentToStatus: Record<string, string> = {
+      booked: "booked",
+      interested: "interested",
+      not_interested: "not_interested",
+      follow_up: "follow_up",
+      queries: "queries",
+    };
+
+    const backfillOps: Promise<any>[] = [];
+
     const enriched = customers.map((c) => {
       const obj = c.toObject();
       const call = callByPhone.get(c.phoneNumber);
       if (!call) return obj;
 
-      // Replace generic name if LLM extracted the real caller name
+      const dbUpdate: any = {};
+
+      // 1. Replace generic name with LLM-extracted real name + queue DB write (fixes search)
       if (/^Contact \d+$/.test(obj.name) && call.llm_analysis?.customer_name) {
         obj.name = call.llm_analysis.customer_name;
+        dbUpdate.name = obj.name;
       }
 
-      // Fill empty pastConversations from the latest Call's llm_analysis
+      // 2. Update status from LLM intent — only if still the default "fresh"
+      //    Guard prevents overwriting statuses the user has manually set
+      const mappedStatus = intentToStatus[call.llm_analysis?.intent] as import("../models/Customer.js").CustomerStatus | undefined;
+      if (obj.status === "fresh" && mappedStatus) {
+        obj.status = mappedStatus;
+        dbUpdate.status = mappedStatus;
+      }
+
+      // 3. Fill empty pastConversations (in-memory only, NOT persisted — modal uses /calls endpoint)
       if (obj.pastConversations.length === 0) {
         obj.pastConversations = [
           {
@@ -132,8 +154,25 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
         ];
       }
 
+      // Queue background DB write for name + status (fire-and-forget)
+      if (Object.keys(dbUpdate).length > 0) {
+        backfillOps.push(
+          Customer.updateOne(
+            { _id: c._id, userId: req.tenantId },
+            { $set: dbUpdate }
+          )
+        );
+      }
+
       return obj;
     });
+
+    // Fire-and-forget — persists real name + status so search works on next load
+    if (backfillOps.length > 0) {
+      Promise.all(backfillOps).catch((err) =>
+        console.error("[CrmRoutes] Backfill error:", err.message)
+      );
+    }
 
     res.json({
       customers: enriched,
@@ -413,6 +452,35 @@ router.post("/bulk-json", isAuthenticated, isSubscribed, async (req: Request, re
   } catch (err: any) {
     console.error("[CrmRoutes] bulk-json error:", err.message);
     res.status(500).json({ message: err.message || "Bulk import failed" });
+  }
+});
+
+// GET /api/crm/:id/calls — All LLM-processed calls for a customer (by phone number)
+// Used by ContactDetailModal to show full call history + transcripts
+router.get("/:id/calls", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
+  try {
+    const customer = await Customer.findOne({
+      _id: req.params.id,
+      userId: req.tenantId,
+    }).select("phoneNumber");
+
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    const calls = await Call.find({
+      userId: req.tenantId,
+      caller_number: customer.phoneNumber,
+      processed: true,
+      llm_analysis: { $ne: null },
+    })
+      .sort({ call_timestamp: -1 })
+      .select(
+        "call_id call_timestamp call_direction call_duration transcript llm_analysis recording_url agent_name"
+      )
+      .lean();
+
+    res.json({ calls });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to fetch call history", error: err.message });
   }
 });
 
