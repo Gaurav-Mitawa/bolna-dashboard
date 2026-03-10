@@ -349,7 +349,44 @@ async function runLlmAnalysis(runId: string): Promise<number> {
         const call = unanalyzed[i];
 
         if (!call.transcript || call.transcript.trim().length < 15) {
-            await Call.updateOne({ call_id: call.call_id }, { $set: { processed: true } });
+            // Short / dropped / silent call — generate synthetic analysis instead of skipping.
+            // This ensures the Call has llm_analysis != null so GET /api/crm enrichment
+            // can populate the Customer row (name, pastConversations, history tab).
+            const direction = call.call_direction === "inbound" ? "Inbound" : "Outbound";
+            const hasShortTranscript = !!(call.transcript && call.transcript.trim().length > 0);
+            const durationNote = call.call_duration ? ` (${Math.round(call.call_duration)}s)` : "";
+
+            const summaryEn = hasShortTranscript
+                ? `${direction} call${durationNote} — very short conversation, possibly a dropped or incomplete call.`
+                : `${direction} call${durationNote} — no conversation recorded (dropped or silent call).`;
+
+            const summaryHi = direction === "Inbound"
+                ? (hasShortTranscript
+                    ? `इनकमिंग कॉल${durationNote} — बहुत कम बातचीत, संभवतः कॉल ड्रॉप हुई।`
+                    : `इनकमिंग कॉल${durationNote} — कोई बातचीत रिकॉर्ड नहीं हुई।`)
+                : (hasShortTranscript
+                    ? `आउटगोइंग कॉल${durationNote} — बहुत कम बातचीत, संभवतः कॉल ड्रॉप हुई।`
+                    : `आउटगोइंग कॉल${durationNote} — कोई बातचीत रिकॉर्ड नहीं हुई।`);
+
+            const syntheticAnalysis = {
+                summary: summaryEn,
+                summary_en: summaryEn,
+                summary_hi: summaryHi,
+                intent: "queries",
+                next_step: "Attempt to reach the customer again.",
+                sentiment: "neutral",
+                customer_name: null,
+                contact_name: null,
+                call_direction: call.call_direction || "unknown",
+                booking: { is_booked: false, date: null, time: null, raw_datetime_string: null },
+            };
+
+            await Call.updateOne(
+                { call_id: call.call_id },
+                { $set: { llm_analysis: syntheticAnalysis, processed: true } }
+            );
+            console.log(`[SyncPoller][${runId}] ✓ Synthetic analysis for short/silent call ${call.call_id}`);
+            count++;
             continue;
         }
 
