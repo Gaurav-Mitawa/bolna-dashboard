@@ -21,6 +21,7 @@ import { Customer } from "../models/Customer.js";
 import { analyzeTranscript } from "./llmService.js";
 import { getApiKey } from "./bolnaService.js";
 import { normalizePhone } from "../utils/phoneUtils.js";
+import { skipTenantEnforcement } from "../plugins/tenantPlugin.js";
 
 const BOLNA_API = "https://api.bolna.ai";
 const DELAY_BETWEEN_LLM_MS = 10_000;
@@ -332,16 +333,18 @@ async function syncCallsForAgent(
 // ─── PHASE 3: LLM analysis for new calls with transcripts ────────────────────
 
 async function runLlmAnalysis(runId: string): Promise<number> {
-    const unanalyzed = await Call.find({
-        processed: false,
-        llm_analysis: null,
-        transcript: { $exists: true, $ne: "" },
-        // Exclude calls that have already exhausted all retry attempts.
-        // `$not: { $gte: MAX_LLM_RETRIES }` also matches docs where llm_retries is
-        // missing/null (legacy records created before this field existed), so old
-        // unanalyzed calls are not silently abandoned after a schema migration.
-        llm_retries: { $not: { $gte: MAX_LLM_RETRIES } },
-    })
+    const unanalyzed = await skipTenantEnforcement(
+        Call.find({
+            processed: false,
+            llm_analysis: null,
+            transcript: { $exists: true, $ne: "" },
+            // Exclude calls that have already exhausted all retry attempts.
+            // `$not: { $gte: MAX_LLM_RETRIES }` also matches docs where llm_retries is
+            // missing/null (legacy records created before this field existed), so old
+            // unanalyzed calls are not silently abandoned after a schema migration.
+            llm_retries: { $not: { $gte: MAX_LLM_RETRIES } },
+        })
+    )
         .sort({ created_at: -1 })
         .limit(MAX_LLM_PER_RUN)
         .lean();
@@ -384,7 +387,7 @@ async function runLlmAnalysis(runId: string): Promise<number> {
             };
 
             await Call.updateOne(
-                { call_id: call.call_id },
+                { call_id: call.call_id, userId: call.userId },
                 { $set: { llm_analysis: syntheticAnalysis, processed: true } }
             );
             console.log(`[SyncPoller][${runId}] ✓ Synthetic analysis for short/silent call ${call.call_id}`);
@@ -404,7 +407,7 @@ async function runLlmAnalysis(runId: string): Promise<number> {
             const analysis = result.analysis;
 
             await Call.updateOne(
-                { call_id: call.call_id },
+                { call_id: call.call_id, userId: call.userId },
                 {
                     $set: {
                         llm_analysis: analysis,
@@ -447,19 +450,31 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                     if (e.code !== 11000) console.error(`[SyncPoller][${runId}] Contact update error:`, e.message);
                 }
 
+                // MongoDB rejects any update where the same field path appears in BOTH
+                // $set and $setOnInsert — even for existing documents (validated at parse
+                // time, not execution time). Use conditional spreading so each field lives
+                // in exactly ONE operator.
+                const hasRealName = !!(
+                    analysis.customer_name &&
+                    !analysis.customer_name.toLowerCase().includes("bolna lead")
+                );
+                const hasMeaningfulStatus = status !== "fresh";
+
                 const customerUpdate: any = {
                     $set: { updatedAt: new Date() },
                     $setOnInsert: {
-                        name: `Contact ${normalizedPhone.slice(-4)}`,
                         email: "",
-                        status: "fresh",
+                        // Include name/status in $setOnInsert ONLY when $set won't also set them.
+                        // This prevents the "conflict at 'name'/'status'" MongoDB error.
+                        ...(!hasRealName       && { name: `Contact ${normalizedPhone.slice(-4)}` }),
+                        ...(!hasMeaningfulStatus && { status: "fresh" }),
                         // pastConversations NOT pre-initialized — $push below auto-creates
                         // the array. Pre-initializing here conflicts with $push when both
-                        // operators fire simultaneously on a new document (MongoDB disallows
-                        // two operators modifying the same path in one update).
+                        // operators fire simultaneously on a new document.
                     },
                 };
-                if (status !== "fresh") customerUpdate.$set.status = status;
+                if (hasMeaningfulStatus) customerUpdate.$set.status = status;
+                if (hasRealName)          customerUpdate.$set.name   = analysis.customer_name;
                 if (analysis.summary) {
                     customerUpdate.$push = {
                         pastConversations: {
@@ -468,12 +483,6 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                             notes: call.transcript || "No transcript",
                         },
                     };
-                }
-                if (
-                    analysis.customer_name &&
-                    !analysis.customer_name.toLowerCase().includes("bolna lead")
-                ) {
-                    customerUpdate.$set.name = analysis.customer_name;
                 }
 
                 try {
@@ -500,7 +509,7 @@ async function runLlmAnalysis(runId: string): Promise<number> {
             const exhausted = newRetryCount >= MAX_LLM_RETRIES;
 
             await Call.updateOne(
-                { call_id: call.call_id },
+                { call_id: call.call_id, userId: call.userId },
                 {
                     $set: {
                         llm_retries: newRetryCount,
@@ -528,10 +537,12 @@ async function runLlmAnalysis(runId: string): Promise<number> {
 
 async function syncCampaignStatuses(runId: string): Promise<void> {
     const terminalStatuses = ["completed", "failed", "stopped", "executed"];
-    const campaigns = await Campaign.find({
-        batchId: { $ne: null },
-        status: { $nin: terminalStatuses },
-    }).lean();
+    const campaigns = await skipTenantEnforcement(
+        Campaign.find({
+            batchId: { $ne: null },
+            status: { $nin: terminalStatuses },
+        })
+    ).lean();
 
     if (!campaigns.length) return;
 
