@@ -120,22 +120,32 @@ export async function analyzeTranscript(
         console.log("[LLM] Using default Grok provider");
     }
 
-    const res = await fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-            model: model,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `Transcript:\n${transcript}` },
-            ],
-            temperature: 0,
-            response_format: { type: "json_object" },
-        }),
-    });
+    // 30-second timeout: without this a hung LLM API stalls the entire poller indefinitely
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Transcript:\n${transcript}` },
+                ],
+                temperature: 0,
+                response_format: { type: "json_object" },
+            }),
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
 
     if (!res.ok) {
         const errText = await res.text();
@@ -172,6 +182,17 @@ export async function analyzeTranscript(
         }
         if (!analysis.call_direction || !["inbound", "outbound"].includes(analysis.call_direction)) {
             analysis.call_direction = "outbound";
+        }
+        // intent and booking can be undefined if LLM omits them — callers (syncPoller Phase 3)
+        // assume they always exist, so set safe defaults here.
+        if (!analysis.intent) {
+            analysis.intent = "queries";
+        }
+        if (!analysis.summary) {
+            analysis.summary = analysis.summary_en || analysis.summary_hi || "";
+        }
+        if (!analysis.booking) {
+            analysis.booking = { is_booked: false, date: null, time: null, raw_datetime_string: null };
         }
 
         return { analysis, raw };
