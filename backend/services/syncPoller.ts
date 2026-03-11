@@ -25,7 +25,7 @@ import { skipTenantEnforcement } from "../plugins/tenantPlugin.js";
 
 const BOLNA_API = "https://api.bolna.ai";
 const DELAY_BETWEEN_LLM_MS = 10_000;
-const MAX_LLM_PER_RUN = 5;
+const MAX_LLM_PER_RUN = 10;
 // A call that fails LLM analysis this many times is permanently skipped (processed=true)
 // This prevents a bad/short/garbage transcript from blocking the queue forever.
 const MAX_LLM_RETRIES = 3;
