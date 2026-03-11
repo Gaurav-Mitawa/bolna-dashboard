@@ -165,21 +165,38 @@ router.get(
         try {
             const userId = (req.user as any)._id.toString();
 
-            const query: any = {
-                userId,
-                $or: [
-                    { "llm_analysis.booking.is_booked": true },
-                    { "llm_analysis.intent": "booked" },
-                ],
-            };
+            // Aggregation: group by caller_number, take LATEST processed call per person,
+            // then filter to only those where the latest call still has is_booked=true.
+            // This ensures a repeat caller who cancels is automatically removed from /bookings.
+            const pipeline: any[] = [
+                {
+                    $match: {
+                        userId,
+                        processed: true,
+                        llm_analysis: { $ne: null },
+                        ...(req.query.direction ? { call_direction: req.query.direction } : {}),
+                    },
+                },
+                { $sort: { call_timestamp: -1 } },
+                {
+                    $group: {
+                        _id: "$caller_number",
+                        latestCall: { $first: "$$ROOT" },
+                    },
+                },
+                {
+                    $match: {
+                        $or: [
+                            { "latestCall.llm_analysis.booking.is_booked": true },
+                            { "latestCall.llm_analysis.intent": "booked" },
+                        ],
+                    },
+                },
+                { $replaceRoot: { newRoot: "$latestCall" } },
+                { $sort: { call_timestamp: -1 } },
+            ];
 
-            if (req.query.direction) {
-                query.call_direction = req.query.direction;
-            }
-
-            const bookings = await Call.find(query)
-                .sort({ call_timestamp: -1 })
-                .lean();
+            const bookings = await Call.aggregate(pipeline);
             res.json(bookings);
         } catch (err: any) {
             res.status(500).json({ error: err.message });

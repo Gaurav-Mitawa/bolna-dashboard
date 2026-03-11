@@ -131,10 +131,12 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
         dbUpdate.name = obj.name;
       }
 
-      // 2. Update status from LLM intent — only if still the default "fresh"
-      //    Guard prevents overwriting statuses the user has manually set
+      // 2. Update status from LLM intent of the LATEST call.
+      //    Always overwrite so repeat callers who change their mind are reflected correctly.
+      //    intentToStatus only maps LLM-derived intents — manually-set statuses like
+      //    "sent_quotation" that aren't in the map are never touched by enrichment.
       const mappedStatus = intentToStatus[call.llm_analysis?.intent] as import("../models/Customer.js").CustomerStatus | undefined;
-      if (obj.status === "fresh" && mappedStatus) {
+      if (mappedStatus) {
         obj.status = mappedStatus;
         dbUpdate.status = mappedStatus;
       }

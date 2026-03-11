@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "Backend",
-      "runtimeExecutable": "D:\\nodejs\\npx.cmd",
-      "runtimeArgs": ["tsx", "backend/server.ts"],
-      "port": 3000
+      "runtimeExecutable": "D:\\Autonoetic_edge\\BOLNA-clusterx\\BOLNA\\.claude\\worktrees\\hungry-swirles\\node_modules\\.bin\\tsx.cmd",
+      "runtimeArgs": ["backend/server.ts"],
+      "port": 3000,
+      "autoPort": false
     }
   ]
 }
