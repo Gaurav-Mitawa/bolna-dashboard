@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { Customer } from "../models/Customer.js";
 import { Call } from "../models/Call.js";
+import { Contact } from "../models/Contact.js";
+import { Agent } from "../models/Agent.js";
 import { isAuthenticated, isSubscribed } from "../middleware/auth.js";
 import { attachTenantContext } from "../middleware/tenantContext.js";
 import { runSyncPoller } from "../services/syncPoller.js";
@@ -58,6 +60,79 @@ router.post("/sync-bolna", isAuthenticated, isSubscribed, async (req: Request, r
   }
 });
 
+// POST /api/crm/repair-tenant — Fix for userId mismatch caused by registering the same
+// Bolna API key under a different Gmail account first, or for a full clean restart.
+//
+// Default mode: Deletes Call docs that belong to THIS user's agents but have the wrong
+//   userId, then triggers re-sync. Safe for multi-user: scoped by agent_id.
+//
+// fullReset mode (body: { fullReset: true }): Wipes ALL data for this user
+//   (Call, Contact, Customer, Agent) so Phase 1 rebuilds Agent docs + Phase 2 recreates
+//   calls under the correct userId from scratch.
+//
+// How to trigger from browser console (voice.clusterx.ai DevTools):
+//   Normal:     fetch("/api/crm/repair-tenant", { method: "POST" }).then(r=>r.json()).then(console.log)
+//   Full reset: fetch("/api/crm/repair-tenant", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ fullReset: true }) }).then(r=>r.json()).then(console.log)
+router.post("/repair-tenant", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
+    try {
+        const correctUserId = req.tenantId!;
+        const fullReset = req.body?.fullReset === true;
+
+        if (fullReset) {
+            // Full clean restart — wipe ALL collections for this user.
+            // Phase 1 on next Sync Bolna will rebuild Agent docs.
+            // Phase 2 will recreate calls under the correct userId.
+            await Promise.all([
+                Call.deleteMany({ userId: correctUserId }),
+                Contact.deleteMany({ userId: correctUserId }),
+                Customer.deleteMany({ userId: correctUserId }),
+                Agent.deleteMany({ userId: correctUserId }),
+            ]);
+            runSyncPoller().catch((err: any) =>
+                console.error("[CrmRoutes] repair-tenant fullReset poller error:", err)
+            );
+            return res.json({
+                fixed: true,
+                fullReset: true,
+                message: "All data wiped. Sync started — will repopulate in ~5 min.",
+            });
+        }
+
+        // Partial repair: find agents that now belong to this user (Phase 1 already set userId correctly)
+        const myAgents = await Agent.find({ userId: correctUserId }).lean();
+        const myBolnaAgentIds = myAgents.map((a: any) => a.bolnaAgentId);
+
+        if (!myBolnaAgentIds.length) {
+            return res.json({
+                error: "No agents found for this user. Click Sync Bolna first, then retry.",
+            });
+        }
+
+        // Delete calls with my agent_ids but wrong userId
+        // This is safe: agent_id scoping means only this user's agents are affected
+        const callResult = await Call.deleteMany({
+            agent_id: { $in: myBolnaAgentIds },
+            userId: { $ne: correctUserId },
+        });
+
+        runSyncPoller().catch((err: any) =>
+            console.error("[CrmRoutes] repair-tenant poller error:", err)
+        );
+
+        return res.json({
+            fixed: true,
+            myAgents: myAgents.map((a: any) => ({ name: a.agentName, id: a.bolnaAgentId })),
+            staleCallsDeleted: callResult.deletedCount,
+            message: callResult.deletedCount > 0
+                ? `Deleted ${callResult.deletedCount} stale calls. Sync started — /customers will populate in ~5 min.`
+                : "No stale calls found. Sync started anyway to ensure data is fresh.",
+        });
+    } catch (err: any) {
+        console.error("[CrmRoutes] repair-tenant error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/crm — Paginated List with Filters
 router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
   try {
@@ -78,7 +153,9 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     }
 
     if (req.query.search) {
-      const searchRegex = new RegExp((req.query.search as string).trim(), "i");
+      // Escape special regex metacharacters to prevent regex injection attacks
+      const escaped = (req.query.search as string).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escaped, "i");
       filter.$or = [{ name: searchRegex }, { phoneNumber: searchRegex }];
     }
 
@@ -93,7 +170,8 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
 
     // Enrich customers with data from latest processed Call (same source as /bookings).
     // Uses phone number variants to handle raw vs normalized mismatches from Bolna API.
-    const phoneNumbers = customers.map((c) => c.phoneNumber);
+    // Filter out null/undefined phoneNumbers to prevent "null.replace is not a function" crashes
+    const phoneNumbers = customers.map((c) => c.phoneNumber).filter(Boolean) as string[];
 
     // Build all possible raw phone variants that Bolna may have stored in caller_number
     const phoneVariants = new Set<string>(phoneNumbers);
@@ -142,8 +220,12 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
 
       const dbUpdate: any = {};
 
-      // 1. Replace generic name with LLM-extracted real name + queue DB write (fixes search)
-      if (/^Contact \d+$/.test(obj.name) && call.llm_analysis?.customer_name) {
+      // 1. Always update name from latest call's LLM extraction — not just for "Contact XXXX".
+      //    If call 1 extracted "Suraj" and call 2 extracts "Suraj Sharma", the list reflects
+      //    the fuller name immediately. Matches Phase 3's hasRealName guard exactly.
+      //    Guard: null/undefined LLM name → skip (keeps current name). "bolna lead" → skip.
+      if (call.llm_analysis?.customer_name &&
+          !call.llm_analysis.customer_name.toLowerCase().includes("bolna lead")) {
         obj.name = call.llm_analysis.customer_name;
         dbUpdate.name = obj.name;
       }
@@ -158,20 +240,23 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
         dbUpdate.status = mappedStatus;
       }
 
-      // 3. Fill empty pastConversations (in-memory only, NOT persisted — modal uses /calls endpoint)
-      if (obj.pastConversations.length === 0) {
-        obj.pastConversations = [
-          {
-            date: call.call_timestamp || call.created_at,
-            summary: call.llm_analysis.summary || "",
-            summary_en: call.llm_analysis.summary_en || "",
-            summary_hi: call.llm_analysis.summary_hi || "",
-            next_step: call.llm_analysis.next_step || "",
-            sentiment: call.llm_analysis.sentiment || "",
-            notes: call.transcript || "",
-          },
-        ];
-      }
+      // 3. Always override pastConversations with LATEST call data for the list row display.
+      //    Previously only filled if empty — meaning repeat callers' list rows showed stale
+      //    summaries from older $push'd entries instead of the most recent call.
+      //    In-memory only: NOT persisted to DB (dbUpdate never includes pastConversations).
+      //    The ContactDetailModal History tab reads from GET /api/crm/:id/calls directly
+      //    and is unaffected — it always shows the full per-call history from Call docs.
+      obj.pastConversations = [
+        {
+          date: call.call_timestamp || call.created_at,
+          summary: call.llm_analysis.summary || "",
+          summary_en: call.llm_analysis.summary_en || "",
+          summary_hi: call.llm_analysis.summary_hi || "",
+          next_step: call.llm_analysis.next_step || "",
+          sentiment: call.llm_analysis.sentiment || "",
+          notes: call.transcript || "",
+        },
+      ];
 
       // Queue background DB write for name + status (fire-and-forget)
       if (Object.keys(dbUpdate).length > 0) {
@@ -484,6 +569,8 @@ router.get("/:id/calls", isAuthenticated, isSubscribed, async (req: Request, res
     }).select("phoneNumber");
 
     if (!customer) return res.status(404).json({ message: "Customer not found" });
+    // Guard: null phoneNumber would crash rawPhone.replace() below
+    if (!customer.phoneNumber) return res.json({ calls: [] });
 
     // Build phone variants to handle raw vs normalized format from Bolna
     const rawPhone = customer.phoneNumber;

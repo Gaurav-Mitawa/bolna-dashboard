@@ -189,8 +189,8 @@ async function syncCallsForAgent(
                     "";
             }
 
-            // Check if existing record is up-to-date
-            const existing = await Call.findOne({ call_id: exec.id });
+            // Check if existing record is up-to-date — cross-tenant dedup check by call_id
+            const existing = await skipTenantEnforcement(Call.findOne({ call_id: exec.id }));
             if (existing) {
                 // If bolna updated_at hasn't changed, skip
                 if (
@@ -202,7 +202,7 @@ async function syncCallsForAgent(
                 }
 
                 // Update call-data fields — NEVER overwrite userId
-                await Call.updateOne(
+                await skipTenantEnforcement(Call.updateOne(
                     { call_id: exec.id },
                     {
                         $set: {
@@ -224,11 +224,12 @@ async function syncCallsForAgent(
                         },
                         // DO NOT include userId in $set — never overwrite on existing record
                     }
-                );
+                ));
                 updated++;
             } else {
                 // New record — set userId from MongoDB Agent doc
-                await Call.findOneAndUpdate(
+                // Cross-tenant upsert: call_id is a global Bolna dedup key across all tenants
+                await skipTenantEnforcement(Call.findOneAndUpdate(
                     { call_id: exec.id },
                     {
                         $set: {
@@ -258,7 +259,7 @@ async function syncCallsForAgent(
                         },
                     },
                     { upsert: true }
-                );
+                ));
                 created++;
 
                 // Upsert Contact (fast, no LLM) — also tracks returning callers
@@ -353,6 +354,17 @@ async function runLlmAnalysis(runId: string): Promise<number> {
     for (let i = 0; i < unanalyzed.length; i++) {
         const call = unanalyzed[i];
 
+        // Guard: a call with missing userId would cause Call.updateOne({ call_id, userId: undefined })
+        // to silently match nothing — leaving processed=false forever (infinite loop).
+        if (!call.userId) {
+            console.warn(`[SyncPoller][${runId}] SKIP call ${call.call_id} — missing userId`);
+            await skipTenantEnforcement(Call.updateOne(
+                { call_id: call.call_id },
+                { $set: { processed: true } }
+            ));
+            continue;
+        }
+
         if (!call.transcript || call.transcript.trim().length < 15) {
             // Short / dropped / silent call — generate synthetic analysis instead of skipping.
             // This ensures the Call has llm_analysis != null so GET /api/crm enrichment
@@ -421,79 +433,88 @@ async function runLlmAnalysis(runId: string): Promise<number> {
             if (call.caller_number && analysis) {
                 const normalizedPhone = normalizePhone(call.caller_number);
 
-                let status = "fresh";
-                if (analysis.booking?.is_booked) status = "purchased";
-                else if (analysis.intent === "booked") status = "purchased";
-                else if (analysis.intent === "interested") status = "interested";
-                else if (analysis.intent === "follow_up") status = "follow_up";
-                else if (analysis.intent === "not_interested") status = "not_interested";
+                // Guard: normalizePhone() returns null for unrecognisable numbers.
+                // Writing Contact/Customer with phone: null creates records with null keys
+                // which can't be looked up and generate duplicates on every poller run.
+                if (!normalizedPhone) {
+                    console.warn(`[SyncPoller][${runId}] Phone normalization failed for ${call.caller_number} — skipping Contact/Customer update`);
+                } else {
+                    let status = "fresh";
+                    if (analysis.booking?.is_booked) status = "booked";
+                    else if (analysis.intent === "booked") status = "booked";
+                    else if (analysis.intent === "interested") status = "interested";
+                    else if (analysis.intent === "follow_up") status = "follow_up";
+                    else if (analysis.intent === "not_interested") status = "not_interested";
+                    else if (analysis.intent === "queries") status = "queries";
+                    else if (analysis.intent === "sent_quotation") status = "sent_quotation";
 
-                const contactUpdate: any = {
-                    $set: {
-                        last_call_date: new Date(call.call_timestamp),
-                        last_call_summary: analysis.summary || call.transcript.substring(0, 100) + "...",
-                        last_call_agent: call.agent_name,
-                        updated_at: new Date(),
-                    },
-                };
-                if (status !== "fresh") contactUpdate.$set.tag = status;
-                if (analysis.customer_name && !analysis.customer_name.toLowerCase().includes("bolna lead")) {
-                    contactUpdate.$set.name = analysis.customer_name;
-                }
-
-                try {
-                    await Contact.findOneAndUpdate(
-                        { userId: call.userId, phone: normalizedPhone },
-                        contactUpdate
-                    );
-                } catch (e: any) {
-                    if (e.code !== 11000) console.error(`[SyncPoller][${runId}] Contact update error:`, e.message);
-                }
-
-                // MongoDB rejects any update where the same field path appears in BOTH
-                // $set and $setOnInsert — even for existing documents (validated at parse
-                // time, not execution time). Use conditional spreading so each field lives
-                // in exactly ONE operator.
-                const hasRealName = !!(
-                    analysis.customer_name &&
-                    !analysis.customer_name.toLowerCase().includes("bolna lead")
-                );
-                const hasMeaningfulStatus = status !== "fresh";
-
-                const customerUpdate: any = {
-                    $set: { updatedAt: new Date() },
-                    $setOnInsert: {
-                        email: "",
-                        // Include name/status in $setOnInsert ONLY when $set won't also set them.
-                        // This prevents the "conflict at 'name'/'status'" MongoDB error.
-                        ...(!hasRealName       && { name: `Contact ${normalizedPhone.slice(-4)}` }),
-                        ...(!hasMeaningfulStatus && { status: "fresh" }),
-                        // pastConversations NOT pre-initialized — $push below auto-creates
-                        // the array. Pre-initializing here conflicts with $push when both
-                        // operators fire simultaneously on a new document.
-                    },
-                };
-                if (hasMeaningfulStatus) customerUpdate.$set.status = status;
-                if (hasRealName)          customerUpdate.$set.name   = analysis.customer_name;
-                if (analysis.summary) {
-                    customerUpdate.$push = {
-                        pastConversations: {
-                            date: new Date(call.call_timestamp),
-                            summary: analysis.summary,
-                            notes: call.transcript || "No transcript",
+                    const contactUpdate: any = {
+                        $set: {
+                            last_call_date: new Date(call.call_timestamp),
+                            last_call_summary: analysis.summary || call.transcript.substring(0, 100) + "...",
+                            last_call_agent: call.agent_name,
+                            updated_at: new Date(),
                         },
                     };
-                }
+                    if (status !== "fresh") contactUpdate.$set.tag = status;
+                    if (analysis.customer_name && !analysis.customer_name.toLowerCase().includes("bolna lead")) {
+                        contactUpdate.$set.name = analysis.customer_name;
+                    }
 
-                try {
-                    await Customer.findOneAndUpdate(
-                        { userId: call.userId, phoneNumber: normalizedPhone },
-                        customerUpdate,
-                        { upsert: true }
+                    try {
+                        await Contact.findOneAndUpdate(
+                            { userId: call.userId, phone: normalizedPhone },
+                            contactUpdate
+                        );
+                    } catch (e: any) {
+                        if (e.code !== 11000) console.error(`[SyncPoller][${runId}] Contact update error:`, e.message);
+                    }
+
+                    // MongoDB rejects any update where the same field path appears in BOTH
+                    // $set and $setOnInsert — even for existing documents (validated at parse
+                    // time, not execution time). Use conditional spreading so each field lives
+                    // in exactly ONE operator.
+                    const hasRealName = !!(
+                        analysis.customer_name &&
+                        !analysis.customer_name.toLowerCase().includes("bolna lead")
                     );
-                } catch (e: any) {
-                    console.error(`[SyncPoller][${runId}] Customer update error:`, e.message);
-                }
+                    const hasMeaningfulStatus = status !== "fresh";
+
+                    const customerUpdate: any = {
+                        $set: { updatedAt: new Date() },
+                        $setOnInsert: {
+                            email: "",
+                            // Include name/status in $setOnInsert ONLY when $set won't also set them.
+                            // This prevents the "conflict at 'name'/'status'" MongoDB error.
+                            ...(!hasRealName       && { name: `Contact ${normalizedPhone.slice(-4)}` }),
+                            ...(!hasMeaningfulStatus && { status: "fresh" }),
+                            // pastConversations NOT pre-initialized — $push below auto-creates
+                            // the array. Pre-initializing here conflicts with $push when both
+                            // operators fire simultaneously on a new document.
+                        },
+                    };
+                    if (hasMeaningfulStatus) customerUpdate.$set.status = status;
+                    if (hasRealName)          customerUpdate.$set.name   = analysis.customer_name;
+                    if (analysis.summary) {
+                        customerUpdate.$push = {
+                            pastConversations: {
+                                date: new Date(call.call_timestamp),
+                                summary: analysis.summary,
+                                notes: call.transcript || "No transcript",
+                            },
+                        };
+                    }
+
+                    try {
+                        await Customer.findOneAndUpdate(
+                            { userId: call.userId, phoneNumber: normalizedPhone },
+                            customerUpdate,
+                            { upsert: true }
+                        );
+                    } catch (e: any) {
+                        console.error(`[SyncPoller][${runId}] Customer update error:`, e.message);
+                    }
+                } // end normalizedPhone null guard
             }
 
             count++;
@@ -587,10 +608,10 @@ async function syncCampaignStatuses(runId: string): Promise<void> {
 
             const newStatus = batch.status ? statusMap[batch.status] : undefined;
             if (newStatus && newStatus !== campaign.status) {
-                await Campaign.updateOne(
+                await skipTenantEnforcement(Campaign.updateOne(
                     { _id: campaign._id },
                     { $set: { status: newStatus } }
-                );
+                ));
                 console.log(
                     `[SyncPoller][${runId}] Campaign ${campaign._id} status: ${campaign.status} → ${newStatus}`
                 );
