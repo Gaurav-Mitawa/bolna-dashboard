@@ -440,8 +440,8 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                     console.warn(`[SyncPoller][${runId}] Phone normalization failed for ${call.caller_number} — skipping Contact/Customer update`);
                 } else {
                     let status = "fresh";
-                    if (analysis.booking?.is_booked) status = "purchased";
-                    else if (analysis.intent === "booked") status = "purchased";
+                    if (analysis.booking?.is_booked) status = "booked";
+                    else if (analysis.intent === "booked") status = "booked";
                     else if (analysis.intent === "interested") status = "interested";
                     else if (analysis.intent === "follow_up") status = "follow_up";
                     else if (analysis.intent === "not_interested") status = "not_interested";
