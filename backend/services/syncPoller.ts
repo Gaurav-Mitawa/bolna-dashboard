@@ -299,7 +299,9 @@ async function syncCallsForAgent(
                                     name: `Contact ${normalizedPhone.slice(-4)}`,
                                     email: "",
                                     status: "fresh",
-                                    pastConversations: [],
+                                    // pastConversations NOT pre-initialized — $push in Phase 3
+                                    // auto-creates the array; pre-initializing here would conflict
+                                    // with $push when both operators fire on a new document.
                                 },
                                 $addToSet: {
                                     callDirections: direction === "outbound" ? "outbound" : "inbound",
@@ -451,7 +453,10 @@ async function runLlmAnalysis(runId: string): Promise<number> {
                         name: `Contact ${normalizedPhone.slice(-4)}`,
                         email: "",
                         status: "fresh",
-                        pastConversations: [],
+                        // pastConversations NOT pre-initialized — $push below auto-creates
+                        // the array. Pre-initializing here conflicts with $push when both
+                        // operators fire simultaneously on a new document (MongoDB disallows
+                        // two operators modifying the same path in one update).
                     },
                 };
                 if (status !== "fresh") customerUpdate.$set.status = status;
