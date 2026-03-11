@@ -5,6 +5,7 @@ import { isAuthenticated, isSubscribed } from "../middleware/auth.js";
 import { attachTenantContext } from "../middleware/tenantContext.js";
 import { runSyncPoller } from "../services/syncPoller.js";
 import { generalLimiter } from "../middleware/rateLimiter.js";
+import { normalizePhone } from "../utils/phoneUtils.js";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 
@@ -34,6 +35,15 @@ const upload = multer({
 // POST /api/crm/sync-bolna — Manually trigger the background sync poller
 router.post("/sync-bolna", isAuthenticated, isSubscribed, async (req: Request, res: Response) => {
   try {
+    // Re-enable calls that were previously skipped with no analysis (processed=true, llm_analysis=null).
+    // These could be dropped/silent calls from before synthetic analysis was added, or calls
+    // where the LLM was skipped for any other reason. Resetting them here ensures the poller
+    // generates summaries for them on the next run — scoped to this user only.
+    await Call.updateMany(
+      { userId: req.tenantId, processed: true, llm_analysis: null },
+      { $set: { processed: false, llm_retries: 0 } }
+    );
+
     // Run poller async — respond immediately so the UI doesn't hang
     runSyncPoller().catch(err =>
       console.error("[CrmRoutes] Manual sync poller error:", err)
@@ -82,30 +92,37 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     ]);
 
     // Enrich customers with data from latest processed Call (same source as /bookings).
-    // For customers with empty pastConversations or generic names, pull from Call.llm_analysis.
+    // Uses phone number variants to handle raw vs normalized mismatches from Bolna API.
     const phoneNumbers = customers.map((c) => c.phoneNumber);
-    const latestCallsRaw = await Call.aggregate([
-      {
-        $match: {
-          userId: req.tenantId,
-          caller_number: { $in: phoneNumbers },
-          processed: true,
-          llm_analysis: { $ne: null },
-        },
-      },
-      { $sort: { call_timestamp: -1 } },
-      {
-        $group: {
-          _id: "$caller_number",
-          latestCall: { $first: "$$ROOT" },
-        },
-      },
-    ]);
 
+    // Build all possible raw phone variants that Bolna may have stored in caller_number
+    const phoneVariants = new Set<string>(phoneNumbers);
+    for (const p of phoneNumbers) {
+      const digits = p.replace(/\D/g, "");            // "918769123231"
+      const tenDigit = digits.replace(/^91/, "");     // "8769123231"
+      phoneVariants.add(tenDigit);
+      phoneVariants.add("+" + tenDigit);              // "+8769123231"
+      phoneVariants.add("91" + tenDigit);             // "918769123231"
+      phoneVariants.add("0" + tenDigit);              // "08769123231"
+    }
+
+    // Fetch all matching processed calls sorted desc, then group in Node.js
+    // (Node.js grouping allows us to normalize phone keys before matching)
+    const rawCalls = await Call.find({
+      userId: req.tenantId,
+      caller_number: { $in: Array.from(phoneVariants) },
+      processed: true,
+      llm_analysis: { $ne: null },
+    }).sort({ call_timestamp: -1 }).lean();
+
+    // Group by normalized phone — first entry per phone = latest call
     const callByPhone = new Map<string, any>();
-    latestCallsRaw.forEach(({ _id, latestCall }: any) =>
-      callByPhone.set(_id, latestCall)
-    );
+    for (const call of rawCalls) {
+      const normalizedKey = normalizePhone(call.caller_number as string) || (call.caller_number as string);
+      if (!callByPhone.has(normalizedKey)) {
+        callByPhone.set(normalizedKey, call);
+      }
+    }
 
     // Same intent→status mapping as syncPoller Phase 3
     const intentToStatus: Record<string, string> = {
@@ -468,9 +485,18 @@ router.get("/:id/calls", isAuthenticated, isSubscribed, async (req: Request, res
 
     if (!customer) return res.status(404).json({ message: "Customer not found" });
 
+    // Build phone variants to handle raw vs normalized format from Bolna
+    const rawPhone = customer.phoneNumber;
+    const digits = rawPhone.replace(/\D/g, "");
+    const tenDigit = digits.replace(/^91/, "");
+    const phoneVariants = [
+      rawPhone, tenDigit, "+" + tenDigit,
+      "91" + tenDigit, "0" + tenDigit,
+    ];
+
     const calls = await Call.find({
       userId: req.tenantId,
-      caller_number: customer.phoneNumber,
+      caller_number: { $in: phoneVariants },
       processed: true,
       llm_analysis: { $ne: null },
     })
