@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Phone, ArrowRight, Clock, Globe, Building2, GraduationCap, Truck, Heart, ShoppingCart, Briefcase, PhoneCall, Calendar, Database, Check, BarChart3, Sparkles, Play } from "lucide-react";
+import { Phone, ArrowRight, Clock, Globe, Building2, GraduationCap, Truck, Heart, ShoppingCart, Briefcase, PhoneCall, Calendar, Database, Check, BarChart3, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
