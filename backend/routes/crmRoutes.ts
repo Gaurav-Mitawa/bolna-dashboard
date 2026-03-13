@@ -162,7 +162,7 @@ router.get("/", isAuthenticated, isSubscribed, async (req: Request, res: Respons
     const [total, customers] = await Promise.all([
       Customer.countDocuments(filter),
       Customer.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .select("name phoneNumber email status createdAt updatedAt pastConversations callDirections"),
